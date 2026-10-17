@@ -1,0 +1,41 @@
+# Apache settings (XAMPP, cPanel and most PHP hosts read this file).
+
+Options -Indexes
+DirectoryIndex index.php
+
+# Never serve SQL, docs, logs, backups, local config or dotfiles.
+<FilesMatch "(^\.|\.(sql|md|log|ini|bak|sh)$|^config\.local(\.example)?\.php$)">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# Version-control folders, in case the site is deployed with git clone.
+<IfModule mod_alias.c>
+    RedirectMatch 404 /\.(git|svn)(/|$)
+</IfModule>
+
+# CSS and JS links carry ?v=<file time> (see asset()), so browsers may cache them for a long time.
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType text/javascript "access plus 1 year"
+    ExpiresByType image/webp "access plus 1 month"
+</IfModule>
+
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css text/javascript application/javascript application/json image/svg+xml
+</IfModule>
+
+# Once the site has an SSL certificate, uncomment these lines to send every visitor to https://.
+# <IfModule mod_rewrite.c>
+#     RewriteEngine On
+#     RewriteCond %{HTTPS} off
+#     RewriteCond %{HTTP:X-Forwarded-Proto} !https
+#     RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# </IfModule>

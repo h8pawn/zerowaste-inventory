@@ -1,0 +1,86 @@
+# ZeroWaste User Guide
+
+For the staff, managers and admins of the store.
+
+## Signing in
+
+- Staff sign-in page: the site address (for example `https://yourstore.com/`), or **Log in** at the top right of the storefront.
+- New staff: choose **Request an account**. A manager or admin must activate it under **User Accounts** before you can sign in.
+- Forgot your password? Ask a manager or admin to reset it from **User Accounts** (⋮ → Reset password).
+
+## What your role can do
+
+| Role | Can do |
+|------|--------|
+| **Staff** | See every page, print barcode labels, export lists to CSV. Changes are made by a manager or admin. |
+| **Manager** | Add and change items, Quick Scan, receive stock, log waste, record returns, handle online orders, manage suppliers and deliveries, approve and add staff and manager accounts. |
+| **Admin** | Everything, plus admin accounts, **Store Settings** and **Reset system data**. |
+
+## Daily routine
+
+1. **Dashboard:** check the alerts at the top (expiring items, online orders, deliveries).
+2. **Expiring Soon:** items within 3 days of expiry. They're marked down on the storefront automatically: **20% off** 2 days before, **50% off** on the last day.
+3. **Online Orders:** **Mark ready** once packed, then **Picked up** when the customer collects and pays. Stock is deducted at that moment.
+4. **Deliveries:** mark a supplier's delivery **On the way** and **Delivered**, then receive the stock on **Food Items**.
+5. **Log Waste:** record anything thrown away the same day.
+
+Expired stock is handled automatically: when an item passes its expiration date, the remaining quantity is logged as "Expired" waste and the item moves to the **Archive**.
+
+## Food Items
+
+- **Add Item:** fill in name, category, quantity, unit, purchase price and expiration date. Leave **Barcode** blank and the system creates a store barcode for you. Leave **Selling price** blank to use the store's default markup.
+- **Suggested expiry:** after typing the name, the form suggests an expiration date from typical shelf life and from this store's past batches.
+- **Row menu (⋮):** Edit item, Receive stock, Log waste, Record return, Print barcode label, Archive, Delete. Items with waste, return or order history are archived instead of deleted, so reports stay accurate.
+- **Show on the online store:** untick this to hide an item from the storefront.
+- **Export:** downloads the current filtered list as CSV.
+
+### Quick Scan with a barcode scanner
+
+1. Click **Quick Scan** and scan. Each scan adds **1 unit**.
+2. An unknown barcode opens **Add Item** with the barcode filled in. Keep **Save as product template** ticked, and future scans of that product can add new batches by themselves.
+3. Scanning an item whose batch has expired starts a fresh batch with a new expiry date.
+
+Scanner tips: any USB scanner that acts as a keyboard works with no driver needed. Most send **Enter** after each code, which is what Quick Scan expects. If a code isn't recognized, clean the label and try another angle.
+
+### Barcode labels
+
+Tick items and choose **Print labels**, or use ⋮ → Print barcode label. Pick a size, the number of copies, and whether to show the price and best-before date. **Print at 100% scale** so the barcodes scan reliably.
+
+## Waste, returns and reports
+
+- **Log Waste:** choose the item, quantity and reason. The value is calculated from the purchase price unless you type your own.
+- **Returns:**
+  - *From a customer, back on the shelf:* stock goes up.
+  - *From a customer, disposed:* logged as "Customer Return" waste.
+  - *Back to the supplier:* stock goes down; any credit received counts as money recovered.
+- **Waste History:** filter by date, reason or text, and export to CSV.
+- **Reports:** waste value and units by period, reason and category, and the top wasted items.
+- **Dashboard Cost vs Waste vs Loss:** *Cost* is stock received × purchase price. *Waste* is the value of waste entries. *Loss* is waste plus supplier returns that weren't fully credited.
+
+## Online reservations (storefront)
+
+- Customers choose items, a pickup day and time within store hours, and how they'll pay. They receive a code like `LG-7K2M9Q`.
+- Reserved units are held so other customers can't buy them. Stock is deducted only when you mark the order **Picked up**.
+- If an item runs short, the order shows a warning. Update the stock or cancel the order with a reason.
+- Customers can track or cancel a new order at **Track order** using the code and their mobile number.
+
+## Admin: Store Settings
+
+Store name, tagline and announcement bar; address, phone, email and Facebook page; the weekly opening hours and an Open/Closed override; default markup; pickup window and preparation time; e-wallet and bank details shown to customers; and an on/off switch for online reservations.
+
+## Good habits
+
+- Enter the correct expiration date for every batch.
+- Use consistent item names (always "Banana Lakatan", not a mix of spellings). Expiry suggestions learn from past batches with the same name.
+- Log waste the day it happens.
+- Back up the database regularly (phpMyAdmin → Export).
+
+## Troubleshooting
+
+| Problem | What to do |
+|---------|-----------|
+| Can't sign in | Check the email and password; ask an admin to confirm your account is active. |
+| "Your account is view and print only" | Your role is Staff. Ask a manager to make the change or upgrade your role. |
+| "Your session expired" | The page was open too long. Reload and try again. |
+| An item is missing from the list | Clear the search and filters, or check the **Archive**. |
+| An item isn't on the storefront | It needs a purchase or selling price, **Show on the online store** ticked, stock, and an expiry date that hasn't passed. |
