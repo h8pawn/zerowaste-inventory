@@ -16,6 +16,7 @@ Built with plain PHP and MySQL. There is no framework, no build step and no Comp
 - **Suppliers & Deliveries:** supplier records, scheduled deliveries tracked Scheduled → On the way → Delivered, paid/unpaid status, and a notification bell.
 - **Online Orders:** pickup reservations from the storefront. Stock is held while an order is open and deducted when it is picked up.
 - **Users & Store Settings:** sign-up approval, roles, password resets, store hours, markup, pickup rules, payment details.
+- **AI Waste Advisor (admins only):** a built-in AI that learns only from the system's own records. It gives a Zero-Waste Score, ranked recommendations to cut waste (what to mark down or donate, what to order less of, storage, supplier and storefront fixes), an expiry forecast of stock that won't sell in time, safe order sizes, and an "Ask the advisor" chat. Nothing is sent to an outside service.
 
 **Public storefront**
 - Live catalog straight from inventory, with **Today's deals** (20% off 2 days before best-before, 50% off on the last day).
@@ -28,7 +29,7 @@ Built with plain PHP and MySQL. There is no framework, no build step and no Comp
 |------|--------|
 | **Staff** | View everything, print barcode labels, export CSV. Cannot change data. |
 | **Manager** | Everything staff can, plus items, Quick Scan, stock, waste, returns, orders, suppliers, deliveries, and staff/manager accounts. |
-| **Admin** | Everything, plus admin accounts, Store Settings and "Reset system data". |
+| **Admin** | Everything, plus admin accounts, Store Settings, the AI Waste Advisor and "Reset system data". |
 
 The **first account registered on a fresh database becomes the admin**. Later sign-ups are inactive staff until a manager or admin activates them.
 
@@ -50,6 +51,8 @@ The **first account registered on a fresh database becomes the admin**. Later si
 4. Open <http://localhost/capstone/>. You'll be asked to create the admin account.
 
 The storefront is at `/front_page.php`.
+
+**Sample data (optional):** to try the AI Waste Advisor and the dashboards, create the admin account and then run `C:\xampp\php\php.exe database\demo_data.php` from the project folder. It adds 14 sample products with stock, sales, waste, returns and pickup orders, dated relative to today. It only runs on an empty inventory, and **Users & System → Reset system data** removes it again. Don't load it on the live site.
 
 ## Configuration
 
@@ -117,6 +120,7 @@ location ~ /\.|\.(sql|md|log)$|config\.local(\.example)?\.php$ { deny all; }
 ├── suppliers.php           Supplier records
 ├── deliveries.php          Supplier deliveries
 ├── admin_panel.php         Users & system
+├── ai_advisor.php          AI Waste Advisor (admin)
 ├── store_settings.php      Storefront and pickup settings (admin)
 ├── front_page.php          Public storefront
 ├── store_api.php           Public endpoint for placing reservations
@@ -128,10 +132,13 @@ location ~ /\.|\.(sql|md|log)$|config\.local(\.example)?\.php$ { deny all; }
 │   ├── schema.php          Automatic upgrades for older databases
 │   ├── layout.php          Page chrome, navigation, charts, status helpers
 │   ├── store.php           Storefront: settings, pricing, catalog, pickup slots, orders
+│   ├── advisor.php         AI Waste Advisor: sales pace, expiry forecast, order sizes, recommendations, score
+│   ├── advisor_chat.php    "Ask the advisor" answers
 │   ├── deliveries.php      Delivery statuses and notifications
 │   ├── barcode.php         EAN-13 / Code 128 generation and SVG rendering
 │   └── shelf_life.php      Expiry-date estimation
 ├── database/schema.sql     Complete database schema and default data
+├── database/demo_data.php  Optional sample data for trying the system (command line only)
 ├── docs/USER_GUIDE.md      Guide for store staff
 ├── style.css, app.js       Staff interface (light and dark themes)
 └── store.css, store.js     Storefront interface

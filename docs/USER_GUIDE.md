@@ -14,7 +14,7 @@ For the staff, managers and admins of the store.
 |------|--------|
 | **Staff** | See every page, print barcode labels, export lists to CSV. Changes are made by a manager or admin. |
 | **Manager** | Add and change items, Quick Scan, receive stock, log waste, record returns, handle online orders, manage suppliers and deliveries, approve and add staff and manager accounts. |
-| **Admin** | Everything, plus admin accounts, **Store Settings** and **Reset system data**. |
+| **Admin** | Everything, plus admin accounts, **Store Settings**, the **AI Waste Advisor** and **Reset system data**. |
 
 ## Daily routine
 
@@ -67,6 +67,18 @@ Tick items and choose **Print labels**, or use ⋮ → Print barcode label. Pick
 ## Admin: Store Settings
 
 Store name, tagline and announcement bar; address, phone, email and Facebook page; the weekly opening hours and an Open/Closed override; default markup; pickup window and preparation time; e-wallet and bank details shown to customers; and an on/off switch for online reservations.
+
+## Admin: AI Waste Advisor
+
+**Admin → AI Waste Advisor** (or **AI Advisor** on the Dashboard). Only admins can open it. The advisor learns only from this system's records: stock received, sales, waste, returns, suppliers, storage locations and online orders from the last 90 days. It uses no outside service, and nothing leaves the server.
+
+- **Zero-Waste Score (0–100):** waste as a share of stock cost (target 2% or less), stock forecast to expire unsold, the 30-day trend, and how much expired stock was caught before the system had to clear it. 85 or more counts as near zero waste.
+- **Recommendations:** ranked most important first. For example: what to mark down or donate this week, which items to order less of, items to keep chilled, suppliers to talk to, expiring items hidden from the storefront, and older batches to sell first. Each one shows why, in numbers, what to do, and a link to the page where you do it.
+- **Expiry forecast:** stock that won't sell before its best-before date at its usual pace, with the value at risk and the next step. The steps follow the zero-waste ladder: sell at a markdown, then donate (for example to a community pantry), then compost. The bin is the last resort.
+- **Smart order sizes:** the most worth ordering at once, meaning what sells within one shelf life (30 days at most) minus the stock that will still sell.
+- **Ask the advisor:** type a question such as "What should I do today?", "Which supplier causes the most waste?" or "How much milk should I order?", or ask about any item by name. It only answers from the store's records.
+
+The advice gets better with good records: correct expiration dates and purchase prices, a storage location and supplier for each item, a specific waste reason for each entry, and waste logged on the day it happens. Click **Re-analyse** after making changes.
 
 ## Good habits
 

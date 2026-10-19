@@ -171,6 +171,9 @@ $actions = can_manage($user)
         . '<a href="log_waste.php" class="btn btn-primary"><i class="fa-solid fa-trash-can"></i> Log Waste</a>'
     : '<a href="food_items.php" class="btn"><i class="fa-solid fa-print"></i> Print labels</a>'
         . '<a href="reports.php" class="btn btn-primary"><i class="fa-solid fa-chart-column"></i> Reports</a>';
+if (is_admin($user)) {
+    $actions = '<a href="ai_advisor.php" class="btn"><i class="fa-solid fa-robot"></i> AI Advisor</a>' . $actions;
+}
 page_header('Dashboard', $greeting . ', ' . $user['username'] . ' · ' . date('l, F j, Y'), $actions);
 ?>
 

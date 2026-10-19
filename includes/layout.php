@@ -73,7 +73,7 @@ function nav_link(string $href, string $icon, string $label, bool $active, ?int 
 
 /**
  * Opens the app shell. $active is one of: dashboard, items, expiring, lowstock, archive,
- * log_waste, returns, history, reports, orders, suppliers, deliveries, admin, store_settings.
+ * log_waste, returns, history, reports, orders, suppliers, deliveries, advisor, admin, store_settings.
  */
 function render_shell_start(array $user, string $title, string $active): void {
     render_head($title, 'app-body');
@@ -163,6 +163,9 @@ function render_shell_start(array $user, string $title, string $active): void {
 
                 <?php if (can_manage($user)): ?>
                     <div class="nav-label">Admin</div>
+                    <?php if (is_admin($user)): ?>
+                        <?= nav_link('ai_advisor.php', 'fa-robot', 'AI Waste Advisor', $active === 'advisor') ?>
+                    <?php endif; ?>
                     <?= nav_link('admin_panel.php', 'fa-user-shield', is_admin($user) ? 'Users & System' : 'User Accounts', $active === 'admin', $c['pending_users'] ?? 0, 'red') ?>
                     <?php if (is_admin($user)): ?>
                         <?= nav_link('store_settings.php', 'fa-sliders', 'Store Settings', $active === 'store_settings') ?>
