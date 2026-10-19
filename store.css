@@ -172,7 +172,7 @@ h1, h2, h3 { margin: 0; line-height: 1.15; }
    A veil on top keeps it from fighting the content; sections below the hero are see-through sheets. */
 body::before {
     content: ""; position: fixed; inset: 0; z-index: -2;
-    background: #0a3f29 url("shutterstock_373602469.webp") center / cover no-repeat;
+    background: #0a3f29 var(--wall-photo, url("store_background.webp")) center / cover no-repeat;
 }
 body::after { content: ""; position: fixed; inset: 0; z-index: -1; background: var(--wall-veil); }
 /* Pages that are mostly text (order tracking) get a heavier veil. */

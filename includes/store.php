@@ -689,7 +689,9 @@ function render_store_head(string $title, string $bodyClass = ''): void {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="preload" as="image" href="shutterstock_373602469.webp">
+    <?php // Versioned like the CSS, so a replaced photo shows at once instead of after the browser cache expires. ?>
+    <link rel="preload" as="image" href="<?= e(asset('store_background.webp')) ?>">
+    <style>:root { --wall-photo: url("<?= e(asset('store_background.webp')) ?>"); }</style>
     <link rel="stylesheet" href="<?= asset('store.css') ?>">
 </head>
 <body<?= $bodyClass !== '' ? ' class="' . e($bodyClass) . '"' : '' ?>>
