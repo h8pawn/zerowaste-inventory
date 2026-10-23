@@ -58,7 +58,8 @@ body {
 }
 a { color: var(--accent); }
 h1, h2, h3 { margin: 0; line-height: 1.15; }
-.wrap { width: min(1280px, calc(100% - 32px)); margin: 0 auto; }
+/* Full-width page with narrow side margins, so the panels sit near the left edge and the photo gets the rest. */
+.wrap { margin: 0 clamp(16px, 1.6vw, 32px); }
 :focus-visible { outline: 3px solid rgba(22, 146, 91, .4); outline-offset: 2px; }
 
 /* ---------- Header ---------- */
@@ -85,13 +86,17 @@ h1, h2, h3 { margin: 0; line-height: 1.15; }
    background-attachment: fixed, which phones ignore.) A veil on top keeps it from fighting the content. */
 body::before {
     content: ""; position: fixed; inset: 0; z-index: -2;
-    background: #0a3f29 var(--wall-photo, url("store_background.webp")) center / cover no-repeat;
+    background: #0a3f29 var(--wall-photo, url("store_background.webp")) no-repeat;
+    /* A little wider than the screen and anchored left, so the middle of the photo lands in the open area to
+       the right of the panels instead of behind them. (The photo is 4:3, so 133.3vh keeps it full height.) */
+    background-size: max(115vw, 133.3vh) auto;
+    background-position: left center;
 }
 body::after { content: ""; position: fixed; inset: 0; z-index: -1; background: var(--wall-veil); }
 
 /* ---------- One-screen layout: one white panel and one green panel on the left, the photo on the right ---------- */
 .front { flex: 1; display: flex; align-items: center; padding: clamp(14px, 3vh, 32px) 0; }
-.front-stack { width: min(680px, 100%); display: flex; flex-direction: column; gap: 12px; }
+.front-stack { width: min(600px, 100%); display: flex; flex-direction: column; gap: 12px; }
 
 /* The white glass panel: headline, tagline and what the store offers. */
 .hero-copy {
@@ -141,9 +146,9 @@ body::after { content: ""; position: fixed; inset: 0; z-index: -1; background: v
 .footer-row a { color: #cfe3d7; }
 
 /* ---------- Smaller screens ---------- */
-/* Short screens (a 1366x768 laptop with browser toolbars, a small window): tighter spacing, and the three
+/* Short screens (a 1366x768 or 1440x900 laptop with browser toolbars, a small window): tighter spacing, and the three
    store highlights become a row of labels, so nothing scrolls. */
-@media (min-width: 701px) and (max-height: 760px) {
+@media (min-width: 701px) and (max-height: 820px) {
     .header-row { height: 56px; }
     .front { padding: 10px 0; }
     .front-stack { gap: 10px; }
@@ -166,16 +171,18 @@ body::after { content: ""; position: fixed; inset: 0; z-index: -1; background: v
     .front { padding: 6px 0; }
     .front-stack { gap: 8px; }
     .kicker { display: none; }
-    .hero-copy { padding: 14px 24px; }
-    .hero-copy h1 { font-size: clamp(26px, 6.4vh, 34px); margin: 0 0 6px; }
-    .lead { font-size: 14px; }
+    .hero-copy { padding: 12px 22px; }
+    .hero-copy h1 { font-size: clamp(24px, 6vh, 32px); margin: 0 0 6px; }
+    .lead { font-size: 13.5px; line-height: 1.4; }
     .visit { margin-top: 8px; padding-top: 8px; }
-    .green-item { padding: 9px 16px; }
-    .green-item strong { font-size: 15.5px; margin-bottom: 2px; }
-    .green-item span { font-size: 12px; }
+    .visit-list { margin-top: 6px; }
+    .green-item { padding: 8px 14px; }
+    .green-item strong { font-size: 15px; margin-bottom: 2px; }
+    .green-item span { font-size: 11.5px; line-height: 1.4; }
     .site-footer { padding: 6px 0; }
 }
 @media (max-width: 700px) {
+    body::before { background-position: center; }
     .front { align-items: flex-start; }
     .green-card { grid-template-columns: 1fr; }
     .green-item + .green-item { border-left: 0; border-top: 1px solid rgba(255, 255, 255, .14); }
