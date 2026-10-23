@@ -447,7 +447,9 @@ a.stat:hover { border-color: var(--g-400); }
 .data-table .col-check { width: 44px; text-align: center; }
 .data-table input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--g-600); cursor: pointer; }
 .data-table thead input[type="checkbox"] { accent-color: #fff; }
+/* Column alignment applies to the header too (the thead rule above would otherwise keep it left). */
 .data-table .center { text-align: center; }
+.data-table .text-right { text-align: right; }
 .data-table .strong { font-weight: 800; color: var(--text); }
 .data-table .col-item { min-width: 210px; }
 .chip-stack { display: flex; flex-wrap: wrap; gap: 4px; }

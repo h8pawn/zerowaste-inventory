@@ -91,7 +91,12 @@ $reasonTones = ['Expired' => 'red', 'Damaged/Spoiled' => 'amber', 'Overstock' =>
 $hasFilters = $filters !== ['from' => '', 'to' => '', 'reason' => 0, 'q' => ''];
 
 render_shell_start($user, 'Waste History', 'history');
-page_header('Waste History', 'Every waste entry, including stock the system moved automatically after it expired.');
+page_header(
+    'Waste History',
+    'Every waste entry, including stock the system moved automatically after it expired.',
+    '<a class="btn" href="' . e(history_url($filters, ['export' => 'csv'])) . '"><i class="fa-solid fa-download"></i> Export</a>'
+        . (can_manage($user) ? '<a class="btn btn-purple" href="log_waste.php"><i class="fa-solid fa-plus"></i> Log Waste</a>' : '')
+);
 ?>
 
 <div class="stats" style="margin-bottom:18px">
@@ -125,9 +130,6 @@ page_header('Waste History', 'Every waste entry, including stock the system move
     </select>
     <button type="submit" class="btn btn-primary"><i class="fa-solid fa-filter"></i> Apply</button>
     <?php if ($hasFilters): ?><a href="waste_history.php" class="btn btn-ghost"><i class="fa-solid fa-xmark"></i> Clear</a><?php endif; ?>
-    <span class="spacer"></span>
-    <a class="btn" href="<?= e(history_url($filters, ['export' => 'csv'])) ?>"><i class="fa-solid fa-download"></i> Export</a>
-    <?php if (can_manage($user)): ?><a class="btn btn-purple" href="log_waste.php"><i class="fa-solid fa-plus"></i> Log Waste</a><?php endif; ?>
 </form>
 
 <div class="table-card">

@@ -294,7 +294,7 @@ page_header('Suppliers', 'Who you buy from, what they deliver, and when they las
 <form class="toolbar" method="GET">
     <div class="search-field">
         <i class="fa-solid fa-magnifying-glass"></i>
-        <input class="input" type="search" name="q" value="<?= e($q) ?>" placeholder="Company, contact, product…" aria-label="Search suppliers">
+        <input class="input" type="search" name="q" value="<?= e($q) ?>" placeholder="Supplier or product…" aria-label="Search suppliers">
     </div>
     <span class="count-pill"><?= count($suppliers) ?> supplier<?= count($suppliers) === 1 ? '' : 's' ?></span>
     <?php if ($q !== ''): ?><a href="suppliers.php" class="btn btn-sm btn-ghost"><i class="fa-solid fa-xmark"></i> Clear</a><?php endif; ?>

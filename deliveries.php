@@ -297,7 +297,7 @@ page_header(
     <input type="hidden" name="tab" value="<?= e($tab) ?>">
     <div class="search-field">
         <i class="fa-solid fa-magnifying-glass"></i>
-        <input class="input" type="search" name="q" value="<?= e($q) ?>" placeholder="Supplier, items or DLV number…" aria-label="Search deliveries">
+        <input class="input" type="search" name="q" value="<?= e($q) ?>" placeholder="Supplier, items, DLV no." aria-label="Search deliveries">
     </div>
     <select class="select" name="supplier" aria-label="Filter by supplier" onchange="this.form.submit()">
         <option value="">All suppliers</option>
