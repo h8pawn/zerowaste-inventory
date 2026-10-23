@@ -1,0 +1,224 @@
+/* =========================================================
+   Lisa Grocery Store — public front page
+   ========================================================= */
+
+:root {
+    --g-950: #06301f;
+    --g-900: #0a3f29;
+    --g-800: #0c5234;
+    --g-700: #0f6640;
+    --g-600: #127a4c;
+    --g-500: #16925b;
+    --g-100: #dff2e8;
+    --g-50: #f0f8f3;
+    --sun: #f6c453;
+    --deal: #d9480f;
+    --deal-bg: #fff0e6;
+    --ink: #142017;
+    --ink-2: #3b4a41;
+    --muted: #66766d;
+    --line: #e2ebe5;
+    --bg: #f7faf6;
+    --card: #ffffff;
+    --radius: 18px;
+    --shadow: 0 1px 2px rgba(16, 60, 39, .05), 0 10px 30px rgba(16, 60, 39, .08);
+    --font: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --serif: "Playfair Display", Georgia, serif;
+
+    /* Theme tokens: everything below is redefined for dark mode. */
+    --title: #06301f;
+    --accent: #127a4c;
+    --accent-ink: #0f6640;
+    --header-bg: rgba(255, 255, 255, .92);
+    --deal-wash: #fff7ef;
+    --deal-line: #f7d2b8;
+    --wall-veil: linear-gradient(180deg, rgba(6, 48, 31, .16) 0%, rgba(6, 48, 31, .36) 100%);
+    color-scheme: light;
+}
+
+/* Dark mode: follows the device unless the visitor picked light or dark with the moon button. */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --g-50: #13241b; --g-100: #183526;
+        --deal: #ff8a4c; --deal-bg: #3a1f10;
+        --ink: #e4eee8; --ink-2: #c2d0c8; --muted: #8fa399; --line: #22342a; --bg: #0c1511; --card: #121e18;
+        --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .3);
+        --title: #d9f2e4; --accent: #5fd199; --accent-ink: #7fdcaa;
+        --header-bg: rgba(12, 21, 17, .9);
+        --deal-wash: #1c1510; --deal-line: #5a3418;
+        --wall-veil: linear-gradient(180deg, rgba(5, 14, 10, .40) 0%, rgba(5, 14, 10, .68) 100%);
+        color-scheme: dark;
+    }
+}
+:root[data-theme="dark"] {
+    --g-50: #13241b; --g-100: #183526;
+    --deal: #ff8a4c; --deal-bg: #3a1f10;
+    --ink: #e4eee8; --ink-2: #c2d0c8; --muted: #8fa399; --line: #22342a; --bg: #0c1511; --card: #121e18;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 10px 30px rgba(0, 0, 0, .3);
+    --title: #d9f2e4; --accent: #5fd199; --accent-ink: #7fdcaa;
+    --header-bg: rgba(12, 21, 17, .9);
+    --deal-wash: #1c1510; --deal-line: #5a3418;
+    --wall-veil: linear-gradient(180deg, rgba(5, 14, 10, .40) 0%, rgba(5, 14, 10, .68) 100%);
+    color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+body { margin: 0; font-family: var(--font); color: var(--ink); background: var(--bg); line-height: 1.55; -webkit-font-smoothing: antialiased; }
+/* Short pages still fill the screen, so the footer always sits at the bottom. */
+body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+body > main { flex: 1 0 auto; }
+a { color: var(--accent); }
+h1, h2, h3 { margin: 0; line-height: 1.15; }
+.wrap { width: min(1200px, calc(100% - 32px)); margin: 0 auto; }
+
+/* ---------- Buttons ---------- */
+.btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 46px; padding: 0 20px; border-radius: 12px; border: 1px solid transparent;
+    font: inherit; font-size: 14.5px; font-weight: 800; text-decoration: none; cursor: pointer;
+    transition: transform .1s ease, box-shadow .2s ease, background .2s ease;
+}
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: linear-gradient(135deg, var(--g-500), var(--g-700)); color: #fff; box-shadow: 0 10px 22px rgba(18, 122, 76, .28); }
+.btn-primary:hover { box-shadow: 0 12px 26px rgba(18, 122, 76, .36); }
+.btn-light { background: var(--card); color: var(--accent-ink); border-color: var(--line); }
+.btn-light:hover { border-color: var(--g-500); }
+:focus-visible { outline: 3px solid rgba(22, 146, 91, .4); outline-offset: 2px; }
+
+/* ---------- Header ---------- */
+.site-header { position: sticky; top: 0; z-index: 50; background: var(--header-bg); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.header-row { display: flex; align-items: center; gap: 20px; height: 68px; }
+.logo { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--title); flex-shrink: 0; }
+.logo-mark {
+    width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center;
+    background: radial-gradient(circle at 30% 30%, #2aa55d, var(--g-700)); color: #fff; font-weight: 800; font-size: 14px;
+}
+.logo-text { font-weight: 800; letter-spacing: .6px; font-size: 15px; }
+.site-nav { display: flex; gap: 4px; margin-left: 8px; }
+.site-nav a { padding: 8px 12px; border-radius: 10px; color: var(--ink-2); text-decoration: none; font-weight: 700; font-size: 14px; white-space: nowrap; }
+.site-nav a:hover { background: var(--g-50); color: var(--accent-ink); }
+.header-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.hbtn {
+    position: relative; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px;
+    border-radius: 999px; border: 1px solid var(--line); background: var(--card); color: var(--accent-ink);
+    font: inherit; font-size: 13.5px; font-weight: 800; text-decoration: none; cursor: pointer; white-space: nowrap;
+}
+.hbtn-icon { width: 40px; padding: 0; justify-content: center; }
+.hbtn:hover { border-color: var(--g-500); }
+.hbtn-primary { background: var(--g-700); border-color: var(--g-700); color: #fff; }
+.hbtn-primary:hover { background: var(--g-600); }
+.hbtn-ghost { border-color: transparent; background: transparent; color: var(--muted); }
+
+/* ---------- Wallpaper ----------
+   The store photo fills the whole screen behind the page and stays put while it scrolls.
+   (Fixed layers instead of background-attachment: fixed, which phones ignore.)
+   A veil on top keeps it from fighting the content; sections below the hero are see-through sheets. */
+body::before {
+    content: ""; position: fixed; inset: 0; z-index: -2;
+    background: #0a3f29 var(--wall-photo, url("store_background.webp")) center / cover no-repeat;
+}
+body::after { content: ""; position: fixed; inset: 0; z-index: -1; background: var(--wall-veil); }
+
+/* ---------- Hero (first screen: the wallpaper with the headline on a glass panel) ---------- */
+.hero {
+    position: relative; display: flex; align-items: center;
+    min-height: calc(100vh - 68px); min-height: calc(100svh - 68px);
+    padding: 44px 0 84px;
+}
+.hero-grid { display: grid; grid-template-columns: minmax(0, 640px) minmax(0, 1fr); gap: 28px; align-items: end; }
+.hero-copy {
+    position: relative; overflow: hidden; border-radius: 26px; padding: clamp(26px, 4vw, 46px);
+    background: var(--card);
+    background: color-mix(in srgb, var(--card) 84%, transparent);
+    border: 1px solid color-mix(in srgb, var(--card) 55%, transparent);
+    -webkit-backdrop-filter: blur(18px) saturate(1.2); backdrop-filter: blur(18px) saturate(1.2);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, .28);
+}
+.hero-copy::before {
+    content: ""; position: absolute; top: -100px; right: -100px; width: 240px; height: 240px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(246, 196, 83, .38), transparent 65%);
+}
+.kicker { position: relative; display: inline-flex; align-items: center; gap: 8px; background: var(--g-50); color: var(--accent-ink); font-size: 12.5px; font-weight: 700; padding: 6px 12px; border-radius: 999px; }
+.hero h1 { font-family: var(--serif); font-size: clamp(34px, 4.6vw, 58px); color: var(--title); margin: 16px 0 12px; letter-spacing: -.5px; }
+.lead { color: var(--muted); font-size: 16px; max-width: 54ch; margin: 0 0 22px; }
+.cta-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.hero-badge {
+    justify-self: end; max-width: 400px; display: flex; gap: 12px; align-items: flex-start;
+    background: rgba(10, 63, 41, .82); color: #fff; padding: 14px 16px; border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, .16);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .25);
+}
+.hero-badge i { font-size: 20px; color: var(--sun); margin-top: 2px; }
+.hero-badge strong { display: block; font-size: 15px; }
+.hero-badge span { font-size: 13px; opacity: .9; }
+.hero-scroll {
+    position: absolute; left: 50%; bottom: 22px; margin-left: -22px; width: 44px; height: 44px; border-radius: 50%;
+    display: grid; place-items: center; color: #fff; text-decoration: none;
+    background: rgba(10, 63, 41, .55); border: 1px solid rgba(255, 255, 255, .45);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    animation: nudge 1.8s ease-in-out infinite;
+}
+.hero-scroll:hover { background: rgba(10, 63, 41, .8); }
+@keyframes nudge { 50% { transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .hero-scroll { animation: none; } }
+
+/* ---------- Sections (see-through sheets over the wallpaper) ---------- */
+.section { padding: 44px 0; background: var(--bg); background: color-mix(in srgb, var(--bg) 88%, transparent); }
+.section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+.eyebrow { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; color: var(--accent); }
+.section-head h2, .visit-card h2 { font-family: var(--serif); font-size: clamp(28px, 3.2vw, 38px); color: var(--title); margin: 6px 0 6px; }
+.section-head p { margin: 0; color: var(--muted); max-width: 62ch; }
+.section-deals { background: linear-gradient(180deg, var(--deal-wash) 0%, var(--bg) 100%); border-top: 1px solid var(--deal-line); }
+.section-deals { background: linear-gradient(180deg, color-mix(in srgb, var(--deal-wash) 92%, transparent) 0%, color-mix(in srgb, var(--bg) 88%, transparent) 100%); }
+.section-deals .eyebrow { color: var(--deal); }
+
+/* ---------- Deals: how the markdowns work ---------- */
+.deal-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.deal-tile { display: flex; gap: 14px; align-items: flex-start; background: var(--card); border: 1px solid var(--deal-line); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+.deal-tile > strong { flex-shrink: 0; min-width: 78px; text-align: center; font-size: 26px; font-weight: 800; color: var(--deal); background: var(--deal-bg); border-radius: 14px; padding: 10px 8px; line-height: 1.1; }
+.deal-tile > strong small { display: block; font-size: 11.5px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase; }
+.deal-tile > i { flex-shrink: 0; width: 52px; height: 52px; display: grid; place-items: center; font-size: 22px; color: var(--accent-ink); background: var(--g-100); border-radius: 14px; }
+.deal-tile h3 { font-size: 16.5px; margin: 2px 0 4px; color: var(--ink); }
+.deal-tile p { margin: 0; color: var(--muted); font-size: 14px; }
+
+/* ---------- Visit ---------- */
+.visit-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 18px; }
+.visit-card, .mission-card { background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 28px; box-shadow: var(--shadow); }
+.visit-card p { margin: 0; color: var(--muted); font-size: 15.5px; max-width: 56ch; }
+.visit-list { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+.visit-list li { display: flex; gap: 14px; align-items: flex-start; }
+.visit-list li > div { flex: 1; min-width: 0; color: var(--ink-2); }
+.visit-list i { width: 38px; height: 38px; flex-shrink: 0; border-radius: 12px; display: grid; place-items: center; background: var(--g-50); color: var(--accent); }
+.visit-list strong { display: block; font-size: 13px; color: var(--muted); }
+.mission-card { background: linear-gradient(160deg, var(--g-800), var(--g-950)); color: #eaf6ef; border: 0; display: flex; flex-direction: column; gap: 10px; }
+.mission-card > i { font-size: 28px; color: var(--sun); }
+.mission-card h3 { font-family: var(--serif); font-size: 26px; color: #fff; }
+.mission-card p { margin: 0; opacity: .9; }
+
+/* ---------- Footer ---------- */
+.site-footer { background: var(--g-950); color: #cfe3d7; padding: 26px 0; }
+.footer-row { display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap; font-size: 13.5px; }
+.footer-row p { margin: 4px 0 0; opacity: .8; max-width: 52ch; }
+.footer-row strong { color: #fff; }
+.footer-meta { display: flex; flex-direction: column; gap: 6px; }
+.footer-meta i { width: 18px; color: var(--sun); }
+.footer-meta a { color: #cfe3d7; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 980px) {
+    .site-nav { display: none; }
+    .hero-grid, .visit-grid { grid-template-columns: 1fr; }
+    .hero-badge { justify-self: stretch; max-width: none; }
+    .deal-tiles { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+    .header-row { gap: 10px; height: 62px; }
+    .logo-text, .hbtn span { display: none; }
+    .header-actions { gap: 6px; }
+    .hbtn { padding: 0 12px; }
+    .hbtn-icon { width: 40px; padding: 0; }
+    .hero { min-height: calc(100vh - 62px); min-height: calc(100svh - 62px); padding: 22px 0 80px; }
+    .visit-card, .mission-card { padding: 22px; }
+}

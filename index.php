@@ -19,7 +19,7 @@ if ($noUsersYet && !$flashes) {
 render_head('Sign in', 'auth-body');
 ?>
     <section class="auth-hero">
-        <a class="brand" href="index.php">
+        <a class="brand" href="front_page.php">
             <span class="brand-logo">ZW</span>
             <span class="brand-text">
                 <strong><?= strtoupper(APP_NAME) ?></strong>
@@ -41,6 +41,7 @@ render_head('Sign in', 'auth-body');
     <section class="auth-panel">
         <div class="auth-card">
             <div class="auth-top">
+                <a href="front_page.php" class="btn btn-sm"><i class="fa-solid fa-store"></i> Store front</a>
                 <button type="button" class="btn btn-sm" data-theme-toggle title="Toggle dark mode"><i class="fa-solid fa-moon"></i></button>
             </div>
 

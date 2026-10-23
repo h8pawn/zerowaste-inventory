@@ -916,7 +916,7 @@ a.stat:hover { border-color: var(--g-400); }
 .auth-card { width: 100%; max-width: 400px; }
 .auth-card h2 { font-size: 24px; font-weight: 800; color: var(--title); }
 .auth-card .page-sub { margin-bottom: 22px; }
-.auth-top { display: flex; justify-content: flex-end; align-items: center; margin-bottom: 36px; }
+.auth-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 36px; }
 .auth-top .btn { border-radius: 999px; }
 .auth-switch { margin-top: 16px; text-align: center; font-size: 13px; color: var(--muted); }
 .auth-switch button { border: 0; background: none; color: var(--g-600); font: inherit; font-weight: 700; cursor: pointer; padding: 0; }

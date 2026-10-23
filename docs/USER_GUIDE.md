@@ -4,7 +4,7 @@ For the staff, managers and admins of the store.
 
 ## Signing in
 
-- Staff sign-in page: the site address (for example `https://yourstore.com/`).
+- Staff sign-in page: the site address (for example `https://yourstore.com/`), or **Log in** at the top right of the store's front page.
 - New staff: choose **Request an account**. A manager or admin must activate it under **User Accounts** before you can sign in.
 - Forgot your password? Ask a manager or admin to reset it from **User Accounts** (⋮ → Reset password).
 

@@ -6,6 +6,7 @@ require_once __DIR__ . '/deliveries.php';
 const APP_NAME = 'ZeroWaste';
 const APP_TAGLINE = 'Lisa Grocery · Ops';
 const STORE_NAME = 'Lisa Grocery Store';
+const STORE_TAGLINE = 'Your neighborhood store for fresh produce, daily essentials and friendly service.';
 
 // Markup on the purchase price for items without their own selling price.
 const DEFAULT_MARKUP_PERCENT = 25;
@@ -131,6 +132,7 @@ function render_shell_start(array $user, string $title, string $active): void {
             <button class="pill-btn" type="button" data-theme-toggle title="Toggle dark mode">
                 <i class="fa-solid fa-moon"></i><span class="hide-sm">Theme</span>
             </button>
+            <a class="pill-btn hide-sm" href="front_page.php"><i class="fa-solid fa-store"></i>Store</a>
             <span class="user-pill" title="<?= e($user['email']) ?>">
                 <span class="avatar"><?= e($initial) ?></span>
                 <span class="hide-sm"><?= e($user['username']) ?></span>
