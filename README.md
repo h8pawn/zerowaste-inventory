@@ -15,7 +15,7 @@ Built with plain PHP and MySQL. There is no framework, no build step and no Comp
 - **Returns:** stock sent back to suppliers, with the credit recovered.
 - **Suppliers & Deliveries:** supplier records, scheduled deliveries tracked Scheduled → On the way → Delivered, paid/unpaid status, and a notification bell.
 - **Users:** sign-up approval, roles, password resets.
-- **AI Waste Advisor (admins and managers):** a built-in AI that learns only from the system's own records. It gives a Zero-Waste Score, ranked recommendations to cut waste (what to mark down or donate, what to order less of, storage and supplier fixes), an expiry forecast of stock that won't sell in time, safe order sizes, and an "Ask the advisor" chat. Nothing is sent to an outside service.
+- **AI Waste Advisor (admins and managers):** works out a Zero-Waste Score, ranked recommendations to cut waste (what to mark down or donate, what to order less of, storage and supplier fixes), an expiry forecast of stock that won't sell in time, and safe order sizes, all on the server from the system's own records. Its **Ask the advisor** chat is answered by **Claude** (Anthropic's AI) when an API key is set: ask anything about the store in plain English, Filipino or Taglish ("How many items are in stock?", "Which supplier wastes the most?", "Anong deliveries ang darating bukas?"). Claude looks up the records it needs through read-only lookups, so it can't change data. Without a key the chat uses built-in answers and nothing leaves the server.
 
 ## User roles
 
@@ -58,6 +58,7 @@ Settings are read from `config.local.php` first, then from environment variables
 | `DB_NAME` | Database name | `zerowaste` |
 | `DB_USER` | Database user | `root` |
 | `DB_PASSWORD` | Database password | *(empty)* |
+| `ANTHROPIC_API_KEY` | Optional. An Anthropic API key ([console.anthropic.com](https://console.anthropic.com) → API keys) so Claude answers the advisor chat. Billed by Anthropic per question; set a monthly spend limit in the Console. | *(empty: built-in answers)* |
 
 The app's timezone is fixed to **Asia/Manila** (in `config.php`), and MySQL uses the same offset, so "today" means the same thing everywhere.
 
@@ -118,7 +119,8 @@ location ~ /\.|\.(sql|md|log)$|config\.local(\.example)?\.php$ { deny all; }
 │   ├── schema.php          Automatic upgrades for older databases
 │   ├── layout.php          Page chrome, navigation, charts, status and pricing helpers
 │   ├── advisor.php         AI Waste Advisor: sales pace, expiry forecast, order sizes, recommendations, score
-│   ├── advisor_chat.php    "Ask the advisor" answers
+│   ├── advisor_chat.php    "Ask the advisor" built-in answers (used without an API key)
+│   ├── advisor_ai.php      "Ask the advisor" with Claude: read-only store lookups, API calls, reply formatting
 │   ├── deliveries.php      Delivery statuses and notifications
 │   ├── barcode.php         EAN-13 / Code 128 generation and SVG rendering
 │   └── shelf_life.php      Expiry-date estimation
@@ -131,6 +133,7 @@ location ~ /\.|\.(sql|md|log)$|config\.local(\.example)?\.php$ { deny all; }
 ## Security
 
 - Passwords are hashed with `password_hash()`; all SQL uses prepared statements; all output is HTML-escaped.
+- With `ANTHROPIC_API_KEY` set, advisor chat questions and the store records Claude looks up (items, stock, prices, waste, supplier contacts, deliveries) are sent to Anthropic's API. Staff emails and passwords never are. The key stays on the server in `config.local.php`.
 - Every form and AJAX request carries a CSRF token. Session cookies are `HttpOnly`, `SameSite=Lax`, and `Secure` on HTTPS. The session ID changes at sign-in.
 - Roles are re-checked against the database on every request, so a deactivated account is signed out at once.
 - Staff (view-only) accounts are blocked from changing data on the server, not just in the interface.

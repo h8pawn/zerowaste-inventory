@@ -14,4 +14,8 @@ return [
     'DB_NAME' => 'zerowaste',
     'DB_USER' => 'zerowaste_user',
     'DB_PASSWORD' => 'change-me',
+
+    // Optional: an Anthropic API key (console.anthropic.com > API keys) lets Claude answer any question
+    // in the AI Waste Advisor's chat. Leave it empty to use the built-in answers. Usage is billed by Anthropic.
+    'ANTHROPIC_API_KEY' => '',
 ];

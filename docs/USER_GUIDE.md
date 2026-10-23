@@ -54,13 +54,13 @@ Tick items and choose **Print labels**, or use ⋮ → Print barcode label. Pick
 
 ## AI Waste Advisor
 
-**Admin → AI Waste Advisor** (or **AI Advisor** on the Dashboard). Admins and managers can open it. The advisor learns only from this system's records: stock received, sales, waste, supplier returns, suppliers and storage locations from the last 90 days. It uses no outside service, and nothing leaves the server.
+**Admin → AI Waste Advisor** (or **AI Advisor** on the Dashboard). Admins and managers can open it. The score, recommendations, forecast and order sizes are worked out on the server from this system's records: stock received, sales, waste, supplier returns, suppliers and storage locations from the last 90 days.
 
 - **Zero-Waste Score (0–100):** waste as a share of stock cost (target 2% or less), stock forecast to expire unsold, the 30-day trend, and how much expired stock was caught before the system had to clear it. 85 or more counts as near zero waste.
 - **Recommendations:** ranked most important first. For example: what to mark down or donate this week, which items to order less of, items to keep chilled, suppliers to talk to, and older batches to sell first. Each one shows why, in numbers, what to do, and a link to the page where you do it.
 - **Expiry forecast:** stock that won't sell before its best-before date at its usual pace, with the value at risk and the next step. The steps follow the zero-waste ladder: sell at a markdown, then donate (for example to a community pantry), then compost. The bin is the last resort.
 - **Smart order sizes:** the most worth ordering at once, meaning what sells within one shelf life (30 days at most) minus the stock that will still sell.
-- **Ask the advisor:** type a question such as "What should I do today?", "Which supplier causes the most waste?" or "How much milk should I order?", or ask about any item by name. It only answers from the store's records.
+- **Ask the advisor:** when the store's Anthropic API key is set ("Powered by Claude AI" under the chat title), Claude answers any question about the store in your own words, in English, Filipino or Taglish: "How many items are in stock?", "What expires this week?", "How much did we waste on vegetables last month?", "What is Golden Dairy's phone number?", "Which deliveries are still unpaid?". It looks up the records it needs and can't change anything. It remembers the conversation, so follow-up questions work; click **New chat** to start over. Your question and the records it looks up are sent to Anthropic. Without a key, the chat gives built-in answers to common questions and nothing leaves the server.
 
 The advice gets better with good records: correct expiration dates and purchase prices, a storage location and supplier for each item, a specific waste reason for each entry, and waste logged on the day it happens. Click **Re-analyse** after making changes.
 

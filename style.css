@@ -759,6 +759,12 @@ a.stat:hover { border-color: var(--g-400); }
 .ask-msg li + li { margin-top: 3px; }
 .ask-links { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .ask-typing { color: var(--muted); font-style: italic; }
+.ask-note { color: var(--amber-fg); font-size: 12.5px; }
+.ask-msg code { font-family: "JetBrains Mono", monospace; font-size: 12px; padding: 1px 4px; border-radius: 4px; background: var(--gray-bg); }
+.ask-table { overflow-x: auto; margin: 4px 0 8px; }
+.ask-table table { border-collapse: collapse; font-size: 12.5px; }
+.ask-table th, .ask-table td { padding: 4px 8px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+.ask-table th { color: var(--text); font-weight: 800; white-space: nowrap; }
 .ask-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
 .ask-chip {
     padding: 4px 11px;

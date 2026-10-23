@@ -20,6 +20,7 @@ const ADVISOR_INTENTS = [
     'top' => ['most wasted', 'most waste*', 'top', 'worst', 'biggest', 'highest', 'which item*', 'what item*', 'which product*'],
     'totals' => ['how much', 'total*', 'lost', 'lose', 'loss*', 'cost*', 'spent', 'this month', 'last month', 'summary', 'report*', 'money', 'peso*'],
     'today' => ['today', 'what should i do', 'what do i do', 'what to do', 'priorit*', 'urgent*', 'first', 'right now'],
+    'inventory' => ['how many', 'available', 'in stock', 'inventory', 'on hand', 'stock level*', 'stocks', 'ilan', 'meron'],
     'zero' => ['zero waste', 'zero', 'reduce*', 'lessen', 'minimi*', 'cut waste', 'improve*', 'tips', 'advice', 'recommend*', 'suggest*', 'plan', 'prevent*', 'avoid*', 'how can we', 'how do we'],
     'help' => ['help', 'hello', 'hi', 'hey', 'what can you*', 'who are you', 'how do you work', 'how does this work'],
 ];
@@ -29,6 +30,7 @@ const ADVISOR_NAME_STOPWORDS = ['the', 'and', 'for', 'with', 'pack', 'pcs', 'pie
     'medium', 'big', 'box', 'bag', 'bottle', 'can', 'tray', 'dozen', 'local', 'premium', 'organic', 'whole', 'sliced', 'kilo'];
 
 const ADVISOR_SUGGESTIONS = [
+    'How many items are in stock?',
     'What should I do today?',
     'How can we reach zero waste?',
     'What will be wasted next month?',
@@ -77,6 +79,7 @@ function advisor_answer(string $question, array $a): string {
         'top' => advisor_answer_top($a),
         'totals' => advisor_answer_totals($a),
         'today' => advisor_answer_today($a),
+        'inventory' => advisor_answer_inventory(),
         'zero' => advisor_answer_zero($a),
         'help' => [
             ['p', 'I\'m the ZeroWaste AI Advisor. I learn only from this store\'s records: inventory, stock received, sales, waste, supplier returns and suppliers. Nothing comes from outside the system.'],
@@ -341,6 +344,29 @@ function advisor_answer_order(array $a): array {
         ['p', 'Safe order sizes: never more than sells within one shelf life, minus what is already on the shelf.'],
         ['ul', $lines],
         ['p', 'Ask about one item by name for its details.'],
+    ];
+}
+
+function advisor_answer_inventory(): array {
+    $s = array_map('floatval', db_one(
+        'SELECT COUNT(*) AS records, COUNT(DISTINCT LOWER(TRIM(name))) AS products, COALESCE(SUM(quantity), 0) AS units,
+                COALESCE(SUM(quantity > 0), 0) AS in_stock, COALESCE(SUM(quantity = 0), 0) AS out_of_stock,
+                COALESCE(SUM(quantity > 0 AND quantity <= ?), 0) AS low_stock,
+                COALESCE(SUM(quantity > 0 AND expiration_date BETWEEN CURDATE() AND CURDATE() + INTERVAL ? DAY), 0) AS expiring,
+                COALESCE(SUM(quantity * COALESCE(purchase_price, 0)), 0) AS value
+         FROM food_items WHERE archived_at IS NULL',
+        'ii',
+        [LOW_STOCK_THRESHOLD, EXPIRING_SOON_DAYS]
+    ));
+    return [
+        ['p', '**' . advisor_plural((int) $s['in_stock'], 'item') . ' available** right now: ' . number_format($s['units']) . ' units in stock, worth '
+            . peso($s['value'], 0) . ' at purchase price.'],
+        ['ul', [
+            number_format($s['records']) . ' item records in inventory (' . advisor_plural((int) $s['products'], 'product') . ', counting each batch separately)',
+            number_format($s['out_of_stock']) . ' out of stock, ' . number_format($s['low_stock']) . ' low (' . LOW_STOCK_THRESHOLD . ' units or fewer)',
+            number_format($s['expiring']) . ' expiring within ' . EXPIRING_SOON_DAYS . ' days',
+        ]],
+        ['links', [['Food Items', 'food_items.php'], ['Low Stock', 'food_items.php?status=low']]],
     ];
 }
 

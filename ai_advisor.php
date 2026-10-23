@@ -1,22 +1,49 @@
 <?php
 require_once __DIR__ . '/includes/app.php';
 require_once __DIR__ . '/includes/layout.php';
-require_once __DIR__ . '/includes/advisor_chat.php';
+require_once __DIR__ . '/includes/advisor_ai.php';
 
 $user = require_login();
 if (!can_manage($user) && is_ajax()) {
     json_response(['success' => false, 'message' => 'Only admins and managers can use the AI Waste Advisor.'], 403);
 }
 require_role($user, ['admin', 'manager']);
+$aiOn = advisor_ai_enabled();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_ajax()) {
-    if (($_POST['action'] ?? '') !== 'ask') {
+    $action = $_POST['action'] ?? '';
+    if ($action === 'new_chat') {
+        unset($_SESSION[ADVISOR_AI_SESSION_KEY]);
+        json_response(['success' => true]);
+    }
+    if ($action !== 'ask') {
         json_response(['success' => false, 'message' => 'Unknown action.'], 400);
     }
-    $question = mb_substr(trim((string) ($_POST['question'] ?? '')), 0, 300);
-    json_response(['success' => true, 'html' => advisor_answer($question, advisor_analyze())]);
+    $question = mb_substr(trim((string) ($_POST['question'] ?? '')), 0, 500);
+    if (!$aiOn || $question === '') {
+        json_response(['success' => true, 'html' => advisor_answer($question, advisor_analyze())]);
+    }
+
+    $history = $_SESSION[ADVISOR_AI_SESSION_KEY] ?? [];
+    // An answer can take a while; don't keep the user's other pages waiting on the session lock.
+    session_write_close();
+    set_time_limit(300);
+    try {
+        $reply = advisor_ai_answer($question, $user, $history);
+    } catch (AdvisorAiException $e) {
+        error_log('ZeroWaste AI advisor: ' . $e->kind . ' (HTTP ' . $e->getCode() . '): ' . $e->getMessage());
+        json_response(['success' => true, 'html' => '<p class="ask-note"><i class="fa-solid fa-triangle-exclamation"></i> '
+            . e(advisor_ai_problem($e)) . ' Here is the built-in answer instead.</p>' . advisor_answer($question, advisor_analyze())]);
+    }
+    if ($reply['remember']) {
+        session_start();
+        $history[] = ['prompt' => $reply['prompt'], 'question' => $question, 'answer' => $reply['answer']];
+        $_SESSION[ADVISOR_AI_SESSION_KEY] = array_slice($history, -ADVISOR_AI_HISTORY_TURNS);
+    }
+    json_response(['success' => true, 'html' => advisor_ai_render($reply['answer'])]);
 }
 
+$chat = $aiOn ? ($_SESSION[ADVISOR_AI_SESSION_KEY] ?? []) : [];
 $a = advisor_analyze();
 $t = $a['totals'];
 $score = $a['score'];
@@ -40,10 +67,14 @@ page_header(
 <div class="alert alert-info advisor-note">
     <i class="fa-solid fa-robot"></i>
     <span>
-        Built-in AI: it learns only from ZeroWaste data, here <?= advisor_plural(count($a['products']), 'product') ?>,
-        <?= number_format($wasteEntries) . ($wasteEntries === 1 ? ' waste entry' : ' waste entries') ?>,
+        The score, recommendations and forecasts are worked out on this server from ZeroWaste data only, here <?= advisor_plural(count($a['products']), 'product') ?>,
+        <?= number_format($wasteEntries) . ($wasteEntries === 1 ? ' waste entry' : ' waste entries') ?>
         and <?= advisor_plural((int) $t['receipts90'], 'stock receipt') ?> from the last <?= ADVISOR_WINDOW_DAYS ?> days.
-        Nothing is sent outside the system.
+        <?php if ($aiOn): ?>
+            The chat is answered by Claude, Anthropic's AI: your question and the records it looks up are sent to Anthropic.
+        <?php else: ?>
+            Nothing is sent outside the system.
+        <?php endif; ?>
     </span>
 </div>
 
@@ -138,17 +169,28 @@ page_header(
             <div class="card-head">
                 <div>
                     <div class="card-title"><i class="fa-solid fa-robot"></i> Ask the advisor</div>
-                    <div class="card-sub">Answers come only from this store's records</div>
+                    <div class="card-sub"><?= $aiOn ? 'Powered by Claude AI · answers from this store\'s records' : 'Built-in answers from this store\'s records' ?></div>
                 </div>
+                <?php if ($aiOn): ?>
+                    <button type="button" class="btn btn-sm btn-ghost" id="newChat" title="Start over: the advisor forgets this conversation"><i class="fa-solid fa-plus"></i> New chat</button>
+                <?php endif; ?>
             </div>
             <div class="card-body">
                 <div class="ask-log" id="askLog" aria-live="polite">
                     <div class="ask-msg bot">
-                        <p>Hi <?= e($user['username']) ?>. I've analysed your stock, sales and waste.
+                        <p>Hi <?= e($user['username']) ?>. I've analysed your stock and waste.
                             <?php if ($score): ?>Your Zero-Waste Score is <strong><?= $score['score'] ?>/100</strong> (<?= e($score['grade'][1]) ?>).<?php endif; ?>
                         </p>
-                        <p>Ask me what to do today, what will expire unsold, how much to order, or about any item by name.</p>
+                        <?php if ($aiOn): ?>
+                            <p>Ask me anything about the store in your own words: what's in stock, what is expiring, what we waste and why, suppliers, deliveries, or what to order.</p>
+                        <?php else: ?>
+                            <p>Ask me what's in stock, what to do today, what will expire unsold, how much to order, or about any item by name.</p>
+                        <?php endif; ?>
                     </div>
+                    <?php foreach ($chat as $turn): ?>
+                        <div class="ask-msg user"><?= e($turn['question']) ?></div>
+                        <div class="ask-msg bot"><?= advisor_ai_render($turn['answer']) ?></div>
+                    <?php endforeach; ?>
                 </div>
                 <div class="ask-chips">
                     <?php foreach (ADVISOR_SUGGESTIONS as $s): ?>
@@ -156,7 +198,7 @@ page_header(
                     <?php endforeach; ?>
                 </div>
                 <form class="ask-form" id="askForm" autocomplete="off">
-                    <input class="input" type="text" id="askInput" maxlength="300" placeholder="e.g. How much milk should I order?" aria-label="Your question">
+                    <input class="input" type="text" id="askInput" maxlength="500" placeholder="e.g. How many items are in stock?" aria-label="Your question">
                     <button class="btn btn-primary" type="submit" id="askBtn"><i class="fa-solid fa-paper-plane"></i><span class="hide-sm">Ask</span></button>
                 </form>
             </div>
@@ -256,7 +298,12 @@ page_header(
     <summary class="card-body"><i class="fa-solid fa-circle-info"></i> How the advisor works</summary>
     <div class="card-body" style="padding-top:0">
         <ul>
-            <li><strong>Only your data.</strong> It reads stock received, waste logs, supplier returns, suppliers and storage locations from this system. It calls no outside service.</li>
+            <li><strong>Only your data.</strong> The score, recommendations, forecast and order sizes are worked out on this server from stock received, waste logs, supplier returns, suppliers and storage locations. They call no outside service.</li>
+            <?php if ($aiOn): ?>
+                <li><strong>Ask the advisor.</strong> Questions are answered by Claude, Anthropic's AI. It looks up what it needs through read-only lookups (stock, waste, stock received, supplier returns, suppliers, deliveries and this analysis), so it can't change anything. Your question and the records it looks up are sent to Anthropic. It remembers the last <?= ADVISOR_AI_HISTORY_TURNS ?> questions until you start a new chat.</li>
+            <?php else: ?>
+                <li><strong>Ask the advisor.</strong> Built-in answers matched to your question. Add an Anthropic API key (ANTHROPIC_API_KEY in config.local.php) to let Claude answer any question about the store in plain language.</li>
+            <?php endif; ?>
             <li><strong>Sales pace.</strong> Units that left stock without being wasted or sent back (received − wasted − sent back − in stock now), divided by the days since the item was first stocked. In-store sales are counted too, because they lower the stock.</li>
             <li><strong>Expiry forecast.</strong> Batches sell oldest-expiry first at that pace. Whatever can't sell by the end of its best-before date is predicted waste.</li>
             <li><strong>Smart order sizes.</strong> Pace × shelf life, capped at 30 days, minus the stock that will still sell. Shelf life is how long this store's own batches lasted from delivery to best-before, or the built-in shelf-life profiles for new items.</li>
@@ -299,6 +346,15 @@ page_header(
 
     form.addEventListener('submit', (e) => { e.preventDefault(); ask(input.value); });
     document.querySelectorAll('[data-ask]').forEach((chip) => chip.addEventListener('click', () => ask(chip.dataset.ask)));
+
+    // Earlier questions from this chat are shown on load; New chat makes the advisor forget them.
+    log.scrollTop = log.scrollHeight;
+    document.getElementById('newChat')?.addEventListener('click', () => {
+        if (btn.disabled) return;
+        postForm('ai_advisor.php', { action: 'new_chat' })
+            .then(() => { log.querySelectorAll('.ask-msg:not(:first-child)').forEach((m) => m.remove()); input.focus(); })
+            .catch(() => {});
+    });
 })();
 </script>
 <?php render_shell_end(ob_get_clean()); ?>
