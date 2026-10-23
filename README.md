@@ -13,7 +13,7 @@ Built with plain PHP and MySQL. There is no framework, no build step and no Comp
 - **Automatic expiry handling:** expired stock is logged as "Expired" waste and archived without anyone having to do it.
 - **Log Waste, Waste History, Reports:** reasons, trends, top wasted items and categories, CSV export.
 - **Returns:** stock sent back to suppliers, with the credit recovered.
-- **Suppliers & Deliveries:** supplier records, scheduled deliveries tracked Scheduled → On the way → Delivered, paid/unpaid status, and a notification bell.
+- **Suppliers & Deliveries:** supplier records with the products each one delivers (by category; new categories can be added right there and show up in Add Item), supplier details with everything they have delivered and when they last did business with the store, scheduled deliveries tracked Scheduled → On the way → Delivered, paid/unpaid status, and a notification bell.
 - **Users:** sign-up approval, roles, password resets.
 - **AI Waste Advisor (admins and managers):** works out a Zero-Waste Score, ranked recommendations to cut waste (what to mark down or donate, what to order less of, storage and supplier fixes), an expiry forecast of stock that won't sell in time, and safe order sizes, all on the server from the system's own records. Its **Ask the advisor** chat is answered by **Claude** (Anthropic's AI) when an API key is set: ask anything about the store in plain English, Filipino or Taglish ("How many items are in stock?", "Which supplier wastes the most?", "Anong deliveries ang darating bukas?"). Claude looks up the records it needs through read-only lookups, so it can't change data. Without a key the chat uses built-in answers and nothing leaves the server.
 

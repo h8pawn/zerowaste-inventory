@@ -78,12 +78,25 @@ $waste = function (int $itemId, int $qty, string $reason, int $daysAgo, float $u
 };
 $autoNote = fn (int $expiredDaysAgo): string => 'Auto-moved by system after expiration date (' . $day($expiredDaysAgo) . ').';
 
-db_transaction(function () use ($supplier, $item, $receive, $waste, $autoNote, $day, $adminId) {
+db_transaction(function () use ($supplier, $item, $receive, $waste, $autoNote, $day, $adminId, $category) {
     $freshFarm = $supplier('FreshFarm Produce', 'Mang Romy Dela Cruz', '0917 555 0101', 'Balintawak Market, Quezon City');
     $goldenDairy = $supplier('Golden Dairy Co.', 'Ms. Liza Santos', '0918 555 0202', 'Marilao, Bulacan');
     $lolas = $supplier('Lola\'s Bakery', 'Aling Nena Reyes', '0919 555 0303', 'Brgy. San Roque, Marikina');
     $metro = $supplier('Metro Pantry Supply', 'Mr. Carlo Tan', '0920 555 0404', 'Divisoria, Manila');
     $meats = $supplier('Pampanga Meat Traders', 'Mr. Jun Manalo', '0921 555 0505', 'San Fernando, Pampanga');
+
+    // What each supplier delivers, by category (Suppliers page → Edit → Products they deliver).
+    foreach ([
+        $freshFarm => [['Banana Lakatan', 'Fruits'], ['Carrots', 'Vegetables'], ['Lettuce Romaine', 'Vegetables'], ['Tomato', 'Vegetables']],
+        $goldenDairy => [['Cheddar Cheese', 'Dairy'], ['Eggs Tray (30s)', 'Dairy'], ['Fresh Milk 1L', 'Dairy']],
+        $lolas => [['Pandesal Pack', 'Bakery']],
+        $metro => [['Canned Sardines', 'Pantry'], ['Instant Noodles', 'Pantry'], ['Rice 5kg', 'Pantry'], ['Soft Drink 1.5L', 'Pantry']],
+        $meats => [['Chicken Breast', 'Meat/Seafood'], ['Pork Liempo', 'Meat/Seafood']],
+    ] as $supplierId => $products) {
+        foreach ($products as [$productName, $cat]) {
+            db_exec('INSERT INTO supplier_products (supplier_id, category_id, name) VALUES (?, ?, ?)', 'iis', [$supplierId, $category($cat), $productName]);
+        }
+    }
 
     // Banana: ordered in bigger lots than it sells, so batches keep expiring → "Order less", sell this week.
     $b = $item('Banana Lakatan', 'Fruits', 0, 'pcs', 6, -78, 'Shelf A', $freshFarm, -85, true);

@@ -44,6 +44,13 @@ Scanner tips: any USB scanner that acts as a keyboard works with no driver neede
 
 Tick items and choose **Print labels**, or use ⋮ → Print barcode label. Pick a size, the number of copies, and whether to show the price and best-before date. **Print at 100% scale** so the barcodes scan reliably.
 
+## Suppliers
+
+- **Add Supplier / Edit:** company name, contact person, phone, email and location, plus **Products they deliver**: one row per product with its category. If the supplier already delivered items that are in inventory, **Add … items they already delivered** fills the list in one click.
+- **New category:** type it in **Category not in the list?** and click **Add category**. It is saved right away and appears in every category list, including **Add Item** on Food Items.
+- **Supplier details:** click a supplier's name (or ⋮ → View details) to see when they last did business with the store, the products they deliver, everything received from them (units, how many times, last delivered) and their recent deliveries.
+- Each card also shows how long ago the last delivery was.
+
 ## Waste, returns and reports
 
 - **Log Waste:** choose the item, quantity and reason. The value is calculated from the purchase price unless you type your own.

@@ -5,11 +5,12 @@
 // and removes what older versions had for the online store and customer returns.
 // The checks run until they all pass, then once per SCHEMA_VERSION. Bump it after adding a step.
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 const REQUIRED_TABLES = [
     'users', 'food_categories', 'suppliers', 'food_items', 'waste_reasons', 'waste_logs', 'products',
     'stock_receipts', 'item_returns', 'app_settings', 'supplier_deliveries', 'supplier_delivery_events',
+    'supplier_products',
 ];
 const REQUIRED_ITEM_COLUMNS = ['barcode', 'archived_at', 'archive_reason', 'selling_price'];
 
@@ -147,6 +148,21 @@ function ensureAppSchema(mysqli $conn, array $tables, array $columns): void {
             setting_key VARCHAR(50) PRIMARY KEY,
             setting_value TEXT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    // What each supplier delivers, by category (set on the Suppliers page).
+    if (!isset($tables['supplier_products'])) {
+        $conn->query("CREATE TABLE IF NOT EXISTS supplier_products (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            supplier_id INT NOT NULL,
+            category_id INT NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE,
+            FOREIGN KEY (category_id) REFERENCES food_categories(id) ON DELETE CASCADE,
+            UNIQUE KEY supplier_product (supplier_id, name),
+            INDEX idx_supplier_products_category (category_id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 

@@ -33,6 +33,19 @@ CREATE TABLE IF NOT EXISTS suppliers (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- What each supplier delivers, by category (set on the Suppliers page).
+CREATE TABLE IF NOT EXISTS supplier_products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    supplier_id INT NOT NULL,
+    category_id INT NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE CASCADE,
+    FOREIGN KEY (category_id) REFERENCES food_categories(id) ON DELETE CASCADE,
+    UNIQUE KEY supplier_product (supplier_id, name),
+    INDEX idx_supplier_products_category (category_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- Inventory. Archived items are hidden from lists but keep their history.
 -- selling_price NULL = the default markup on purchase_price.
 CREATE TABLE IF NOT EXISTS food_items (

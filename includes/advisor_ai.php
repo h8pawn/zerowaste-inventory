@@ -140,12 +140,13 @@ function advisor_ai_tools(): array {
         ],
         [
             'name' => 'get_suppliers',
-            'description' => 'Supplier records: contact person, phone, email and address, how many active items and units come from each, '
-                . 'and their open deliveries. Use it for supplier contact details and supplier lists.',
+            'description' => 'Supplier records: contact person, phone, email and address, the products they deliver (with categories), '
+                . 'how many active items and units come from each, their open deliveries and when they last delivered. '
+                . 'Use it for supplier contact details, who supplies what, and supplier lists.',
             'input_schema' => [
                 'type' => 'object',
                 'properties' => [
-                    'query' => ['type' => 'string', 'description' => 'Text to look for in the supplier name or contact person. Leave out to list all.'],
+                    'query' => ['type' => 'string', 'description' => 'Text to look for in the supplier name, contact person or the products they deliver. Leave out to list all.'],
                 ],
             ],
         ],
@@ -599,15 +600,19 @@ function advisor_tool_suppliers(array $in): array {
     $types = '';
     $params = [];
     if (($q = advisor_tool_text($in, 'query')) !== '') {
-        $where = '(s.name LIKE ? OR s.contact_person LIKE ?)';
-        $types = 'ss';
-        $params = ['%' . $q . '%', '%' . $q . '%'];
+        $where = '(s.name LIKE ? OR s.contact_person LIKE ? OR EXISTS (SELECT 1 FROM supplier_products sp WHERE sp.supplier_id = s.id AND sp.name LIKE ?))';
+        $types = 'sss';
+        $params = array_fill(0, 3, '%' . $q . '%');
     }
     $rows = db_all(
         "SELECT s.name, s.contact_person, s.phone, s.email, s.address,
                 COUNT(fi.id) AS active_items, COALESCE(SUM(fi.quantity), 0) AS units,
                 (SELECT COUNT(*) FROM supplier_deliveries d WHERE d.supplier_id = s.id AND d.status IN ('scheduled', 'on_the_way')) AS open_deliveries,
-                (SELECT MAX(DATE(d.delivered_at)) FROM supplier_deliveries d WHERE d.supplier_id = s.id AND d.status = 'delivered') AS last_delivered
+                (SELECT MAX(DATE(d.delivered_at)) FROM supplier_deliveries d WHERE d.supplier_id = s.id AND d.status = 'delivered') AS last_delivered,
+                (SELECT MAX(DATE(sr.received_at)) FROM stock_receipts sr JOIN food_items ri ON ri.id = sr.food_item_id
+                 WHERE ri.supplier_id = s.id AND sr.source <> 'adjust') AS last_received,
+                (SELECT GROUP_CONCAT(CONCAT(sp.name, ' (', fc.name, ')') ORDER BY fc.name, sp.name SEPARATOR '; ')
+                 FROM supplier_products sp JOIN food_categories fc ON fc.id = sp.category_id WHERE sp.supplier_id = s.id) AS products
          FROM suppliers s
          LEFT JOIN food_items fi ON fi.supplier_id = s.id AND " . ACTIVE_ITEM_SQL . "
          WHERE $where
@@ -625,8 +630,9 @@ function advisor_tool_suppliers(array $in): array {
         'address' => $r['address'] ?: null,
         'active_items' => (int) $r['active_items'],
         'units_in_stock' => (int) $r['units'],
+        'products_they_deliver' => $r['products'] ? explode('; ', $r['products']) : [],
         'open_deliveries' => (int) $r['open_deliveries'],
-        'last_delivered' => $r['last_delivered'],
+        'last_delivery_or_stock_received' => max($r['last_delivered'] ?? '', $r['last_received'] ?? '') ?: null,
     ], $rows)];
 }
 
