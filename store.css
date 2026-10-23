@@ -89,56 +89,49 @@ body::before {
 }
 body::after { content: ""; position: fixed; inset: 0; z-index: -1; background: var(--wall-veil); }
 
-/* ---------- One-screen layout: headline on the left, store info on the right ---------- */
+/* ---------- One-screen layout: one white panel and one green panel on the left, the photo on the right ---------- */
 .front { flex: 1; display: flex; align-items: center; padding: clamp(14px, 3vh, 32px) 0; }
-.front-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 18px; }
-.front-col { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.front-stack { width: min(680px, 100%); display: flex; flex-direction: column; gap: 12px; }
 
-/* Glass panels over the photo. */
-.hero-copy, .visit-card {
+/* The white glass panel: headline, tagline and what the store offers. */
+.hero-copy {
     position: relative; overflow: hidden; border-radius: 24px;
+    padding: clamp(20px, 3.6vh, 36px) clamp(22px, 3vw, 38px);
     background: var(--card);
     background: color-mix(in srgb, var(--card) 86%, transparent);
     border: 1px solid color-mix(in srgb, var(--card) 55%, transparent);
     -webkit-backdrop-filter: blur(18px) saturate(1.2); backdrop-filter: blur(18px) saturate(1.2);
     box-shadow: 0 24px 60px rgba(0, 0, 0, .25);
 }
-.hero-copy { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: clamp(22px, 4vh, 42px) clamp(22px, 3.4vw, 44px); }
 .hero-copy::before {
     content: ""; position: absolute; top: -100px; right: -100px; width: 240px; height: 240px; border-radius: 50%;
     background: radial-gradient(circle, rgba(246, 196, 83, .38), transparent 65%);
 }
 .kicker { position: relative; display: inline-flex; align-items: center; gap: 8px; background: var(--g-50); color: var(--accent-ink); font-size: 12.5px; font-weight: 700; padding: 6px 12px; border-radius: 999px; }
-.hero-copy h1 { position: relative; font-family: var(--serif); font-size: clamp(32px, min(4.4vw, 7.5vh), 58px); color: var(--title); margin: clamp(10px, 2vh, 18px) 0 clamp(8px, 1.6vh, 14px); letter-spacing: -.5px; }
-.lead { position: relative; color: var(--muted); font-size: 16px; max-width: 52ch; margin: 0; }
+.hero-copy h1 { position: relative; font-family: var(--serif); font-size: clamp(30px, min(4vw, 7vh), 52px); color: var(--title); margin: clamp(10px, 1.8vh, 16px) 0 clamp(8px, 1.4vh, 12px); letter-spacing: -.5px; }
+.lead { position: relative; color: var(--muted); font-size: 15.5px; max-width: 54ch; margin: 0; }
 
-.hero-badge {
-    display: flex; gap: 12px; align-items: flex-start;
-    background: rgba(10, 63, 41, .86); color: #fff; padding: 14px 18px; border-radius: 18px;
-    border: 1px solid rgba(255, 255, 255, .16);
+.visit { position: relative; margin-top: clamp(12px, 2.4vh, 22px); padding-top: clamp(12px, 2.2vh, 18px); border-top: 1px solid var(--line); }
+.eyebrow { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; color: var(--accent); }
+.visit-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.visit-list li { display: flex; gap: 10px; align-items: flex-start; }
+.visit-list li > div { flex: 1; min-width: 0; color: var(--ink-2); font-size: 13px; line-height: 1.4; }
+.visit-list i { width: 32px; height: 32px; flex-shrink: 0; border-radius: 10px; display: grid; place-items: center; background: var(--g-50); color: var(--accent); font-size: 14px; }
+.visit-list strong { display: block; font-size: 13px; color: var(--ink); }
+
+/* The green panel: the two zero-waste messages side by side. */
+.green-card {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+    background: linear-gradient(160deg, rgba(12, 82, 52, .92), rgba(6, 48, 31, .94)); color: #eaf6ef;
+    border: 1px solid rgba(255, 255, 255, .14); border-radius: 22px;
     -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
     box-shadow: 0 16px 40px rgba(0, 0, 0, .25);
 }
-.hero-badge i { font-size: 20px; color: var(--sun); margin-top: 2px; }
-.hero-badge strong { display: block; font-size: 15px; }
-.hero-badge span { font-size: 13.5px; opacity: .92; }
-
-.visit-card { flex: 1; padding: clamp(18px, 3vh, 26px) 24px; }
-.eyebrow { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 800; letter-spacing: .8px; text-transform: uppercase; color: var(--accent); }
-.visit-card h2 { font-family: var(--serif); font-size: clamp(24px, 4vh, 32px); color: var(--title); margin: 4px 0 0; }
-.visit-list { list-style: none; margin: clamp(10px, 2vh, 16px) 0 0; padding: 0; display: flex; flex-direction: column; gap: clamp(8px, 1.6vh, 12px); }
-.visit-list li { display: flex; gap: 12px; align-items: flex-start; }
-.visit-list li > div { flex: 1; min-width: 0; color: var(--ink-2); font-size: 14px; line-height: 1.4; }
-.visit-list i { width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px; display: grid; place-items: center; background: var(--g-50); color: var(--accent); }
-.visit-list strong { display: block; font-size: 12.5px; color: var(--muted); }
-
-.mission-card {
-    background: linear-gradient(160deg, var(--g-800), var(--g-950)); color: #eaf6ef; border-radius: 22px;
-    padding: clamp(16px, 2.8vh, 24px) 24px; box-shadow: 0 16px 40px rgba(0, 0, 0, .25);
-}
-.mission-card h3 { font-family: var(--serif); font-size: 22px; color: #fff; display: flex; align-items: center; gap: 10px; }
-.mission-card h3 i { font-size: 20px; color: var(--sun); }
-.mission-card p { margin: 8px 0 0; opacity: .9; font-size: 14.5px; }
+.green-item { display: flex; gap: 12px; align-items: flex-start; padding: clamp(14px, 2.6vh, 20px) 20px; }
+.green-item + .green-item { border-left: 1px solid rgba(255, 255, 255, .14); }
+.green-item i { font-size: 19px; color: var(--sun); margin-top: 2px; }
+.green-item strong { display: block; font-family: var(--serif); font-size: 18px; color: #fff; margin-bottom: 4px; }
+.green-item span { font-size: 13px; opacity: .9; line-height: 1.45; }
 
 /* ---------- Footer ---------- */
 .site-footer { flex-shrink: 0; background: var(--g-950); color: #cfe3d7; padding: 12px 0; }
@@ -148,56 +141,70 @@ body::after { content: ""; position: fixed; inset: 0; z-index: -1; background: v
 .footer-row a { color: #cfe3d7; }
 
 /* ---------- Smaller screens ---------- */
-/* Short screens (a laptop with browser toolbars, a small window): tighten the spacing so nothing scrolls. */
-@media (min-width: 701px) and (max-height: 620px) {
+/* Short screens (a 1366x768 laptop with browser toolbars, a small window): tighter spacing, and the three
+   store highlights become a row of labels, so nothing scrolls. */
+@media (min-width: 701px) and (max-height: 760px) {
     .header-row { height: 56px; }
     .front { padding: 10px 0; }
-    .front-col { gap: 10px; }
-    .front-grid { gap: 14px; }
-    .hero-copy { padding: 18px 28px; }
-    .hero-copy h1 { font-size: clamp(28px, min(4vw, 7vh), 44px); margin: 10px 0 8px; }
-    .lead { font-size: 15px; }
-    .hero-badge { padding: 10px 16px; }
-    .visit-card { padding: 14px 20px; }
-    .visit-card h2 { font-size: 22px; }
-    .visit-list { margin-top: 8px; gap: 6px; }
-    .visit-list i { width: 30px; height: 30px; }
-    .mission-card { padding: 12px 20px; }
-    .mission-card h3 { font-size: 19px; }
-    .mission-card p { font-size: 13.5px; margin-top: 4px; }
+    .front-stack { gap: 10px; }
+    .hero-copy { padding: 18px 26px; }
+    .hero-copy h1 { font-size: clamp(28px, min(3.8vw, 6.6vh), 42px); margin: 10px 0 8px; }
+    .lead { font-size: 14.5px; }
+    .visit { margin-top: 12px; padding-top: 10px; }
+    .visit-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .visit-list li { align-items: center; gap: 7px; padding: 4px 12px 4px 4px; border-radius: 999px; background: var(--g-50); }
+    .visit-list i { width: 26px; height: 26px; border-radius: 50%; font-size: 12px; background: var(--card); }
+    .visit-list li > div span { display: none; }
+    .visit-list strong { color: var(--accent-ink); font-size: 12.5px; }
+    .green-item { padding: 12px 18px; }
+    .green-item strong { font-size: 16.5px; }
+    .green-item span { font-size: 12.5px; }
     .site-footer { padding: 8px 0; }
+}
+@media (min-width: 701px) and (max-height: 560px) {
+    .header-row { height: 50px; }
+    .front { padding: 6px 0; }
+    .front-stack { gap: 8px; }
+    .kicker { display: none; }
+    .hero-copy { padding: 14px 24px; }
+    .hero-copy h1 { font-size: clamp(26px, 6.4vh, 34px); margin: 0 0 6px; }
+    .lead { font-size: 14px; }
+    .visit { margin-top: 8px; padding-top: 8px; }
+    .green-item { padding: 9px 16px; }
+    .green-item strong { font-size: 15.5px; margin-bottom: 2px; }
+    .green-item span { font-size: 12px; }
+    .site-footer { padding: 6px 0; }
 }
 @media (max-width: 700px) {
     .front { align-items: flex-start; }
-    .front-grid { grid-template-columns: 1fr; gap: 12px; }
-    .front-col { gap: 12px; }
+    .green-card { grid-template-columns: 1fr; }
+    .green-item + .green-item { border-left: 0; border-top: 1px solid rgba(255, 255, 255, .14); }
 }
-/* Phones: the same content, packed tighter, so it still fits one screen on most phones. */
+/* Phones: the same content, packed tighter. */
 @media (max-width: 640px) {
     .header-row { gap: 10px; height: 56px; }
     .logo-mark { width: 36px; height: 36px; font-size: 13px; }
-    .logo-text, .hbtn span { display: none; }
+    .logo-text { font-size: 13px; }
+    .hbtn span { display: none; }
     .hbtn { padding: 0 12px; }
     .hbtn-icon { width: 40px; padding: 0; }
     .front { padding: 12px 0; }
+    .front-stack { gap: 10px; }
     .hero-copy { padding: 18px 20px; border-radius: 20px; }
     .kicker { font-size: 11.5px; padding: 5px 10px; }
     .hero-copy h1 { font-size: 30px; margin: 10px 0 8px; }
     .lead { font-size: 14px; }
-    .hero-badge { padding: 11px 14px; border-radius: 16px; }
-    .hero-badge strong { font-size: 14px; }
-    .hero-badge span { font-size: 12.5px; }
-    .visit-card { padding: 16px 18px; border-radius: 20px; }
-    .visit-card h2 { font-size: 22px; }
-    /* Only the three headings, side by side; the descriptions don't fit a phone screen. */
-    .visit-list { flex-direction: row; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-    .visit-list li { align-items: center; gap: 6px; padding: 5px 10px 5px 5px; border-radius: 999px; background: var(--g-50); }
-    .visit-list i { width: 24px; height: 24px; border-radius: 50%; font-size: 12px; background: var(--card); }
+    .visit { margin-top: 12px; padding-top: 10px; }
+    /* Only the three headings as chips; the descriptions don't fit a phone screen. */
+    .visit-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .visit-list li { align-items: center; gap: 6px; padding: 4px 10px 4px 4px; border-radius: 999px; background: var(--g-50); }
+    .visit-list i { width: 24px; height: 24px; border-radius: 50%; font-size: 11px; background: var(--card); }
     .visit-list li > div span { display: none; }
     .visit-list strong { color: var(--accent-ink); font-size: 12px; }
-    .mission-card { padding: 14px 18px; border-radius: 18px; }
-    .mission-card h3 { font-size: 19px; }
-    .mission-card p { font-size: 13px; margin-top: 6px; }
+    .green-card { border-radius: 18px; }
+    .green-item { padding: 12px 16px; }
+    .green-item strong { font-size: 16px; }
+    .green-item span { font-size: 12.5px; }
     .site-footer { padding: 10px 0; }
     .footer-row { font-size: 11.5px; justify-content: center; text-align: center; }
 }

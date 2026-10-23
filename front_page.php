@@ -44,35 +44,37 @@ require_once __DIR__ . '/includes/layout.php';
     </header>
 
     <main class="front">
-        <div class="wrap front-grid">
-            <div class="front-col">
+        <div class="wrap">
+            <div class="front-stack">
                 <section class="hero-copy">
                     <span class="kicker"><i class="fa-solid fa-leaf"></i> Your zero-waste neighborhood grocery</span>
                     <h1>Fresh groceries,<br>ready when you are.</h1>
                     <p class="lead"><?= e(STORE_TAGLINE) ?> Drop by for what's fresh on our shelves today.</p>
-                </section>
-                <div class="hero-badge">
-                    <i class="fa-solid fa-leaf"></i>
-                    <div>
-                        <strong>Less waste, lower prices</strong>
-                        <span>Food close to its best-before date is marked down up to 50%, so it gets eaten instead of thrown away.</span>
+                    <div class="visit">
+                        <span class="eyebrow">Visit <?= e(STORE_NAME) ?></span>
+                        <ul class="visit-list">
+                            <li><i class="fa-solid fa-carrot"></i><div><strong>Fresh produce</strong><span>Fruits, vegetables, meat and dairy, checked daily.</span></div></li>
+                            <li><i class="fa-solid fa-basket-shopping"></i><div><strong>Daily essentials</strong><span>Pantry staples, bread and drinks.</span></div></li>
+                            <li><i class="fa-solid fa-face-smile"></i><div><strong>Friendly service</strong><span>Ask us for anything you can't find.</span></div></li>
+                        </ul>
                     </div>
-                </div>
-            </div>
-
-            <div class="front-col">
-                <section class="visit-card">
-                    <span class="eyebrow">Visit us</span>
-                    <h2><?= e(STORE_NAME) ?></h2>
-                    <ul class="visit-list">
-                        <li><i class="fa-solid fa-carrot"></i><div><strong>Fresh produce</strong><span>Fruits, vegetables, meat and dairy, checked daily.</span></div></li>
-                        <li><i class="fa-solid fa-basket-shopping"></i><div><strong>Daily essentials</strong><span>Pantry staples, bread and drinks.</span></div></li>
-                        <li><i class="fa-solid fa-face-smile"></i><div><strong>Friendly service</strong><span>Ask us for anything you can't find.</span></div></li>
-                    </ul>
                 </section>
-                <section class="mission-card">
-                    <h3><i class="fa-solid fa-recycle"></i> Our zero-waste promise</h3>
-                    <p>We track every item from delivery to shelf. When food gets close to its best-before date, we mark it down first, because good food belongs on a table, not in the bin.</p>
+
+                <section class="green-card">
+                    <div class="green-item">
+                        <i class="fa-solid fa-leaf"></i>
+                        <div>
+                            <strong>Less waste, lower prices</strong>
+                            <span>Food close to its best-before date is marked down up to 50%, so it gets eaten instead of thrown away.</span>
+                        </div>
+                    </div>
+                    <div class="green-item">
+                        <i class="fa-solid fa-recycle"></i>
+                        <div>
+                            <strong>Our zero-waste promise</strong>
+                            <span>We track every item from delivery to shelf. When food gets close to its best-before date, we mark it down first, because good food belongs on a table, not in the bin.</span>
+                        </div>
+                    </div>
                 </section>
             </div>
         </div>
