@@ -121,110 +121,121 @@ page_header(
     </div>
 </div>
 
-<div class="grid-3-2">
-    <div class="card">
+<?php if ($score): ?>
+    <div class="card" style="margin-top:18px">
         <div class="card-head">
             <div>
-                <div class="card-title"><i class="fa-solid fa-list-check"></i> Recommendations</div>
-                <div class="card-sub"><?= $todo ? advisor_plural($todo, 'action') . ', most important first' : 'Nothing to fix right now' ?></div>
+                <div class="card-title"><i class="fa-solid fa-gauge-high"></i> How the score is made</div>
+                <div class="card-sub"><?= $score['score'] ?> of 100 · <?= $score['score'] >= 85 ? 'near zero waste' : (85 - $score['score']) . ' points to near zero waste (85)' ?></div>
             </div>
         </div>
         <div class="card-body">
-            <?php if ($recs): ?>
-                <ol class="rec-list">
-                    <?php foreach ($recs as $r): [$label, $tone] = ADVISOR_PRIORITIES[$r['priority']]; ?>
-                        <li class="rec rec-<?= e($r['priority']) ?>">
-                            <div class="rec-head">
-                                <span class="rec-icon tone-<?= e($tone) ?>"><i class="fa-solid <?= e($r['icon']) ?>"></i></span>
-                                <div>
-                                    <h3 class="rec-title"><?= e($r['title']) ?></h3>
-                                    <div class="rec-meta">
-                                        <span class="chip chip-<?= e($tone) ?>"><?= e($label) ?></span>
-                                        <?php if ($r['impact']): ?><span class="chip chip-gray"><?= peso($r['impact'], 0) ?> <?= e($r['impact_label']) ?></span><?php endif; ?>
-                                    </div>
-                                </div>
-                            </div>
-                            <p class="rec-why"><?= advisor_text($r['why']) ?></p>
-                            <?php if ($r['actions']): ?>
-                                <ul class="rec-actions">
-                                    <?php foreach ($r['actions'] as $action): ?><li><?= advisor_text($action) ?></li><?php endforeach; ?>
-                                </ul>
-                            <?php endif; ?>
-                            <?php if ($r['link']): ?>
-                                <a class="btn btn-sm" href="<?= e($r['link'][1]) ?>"><?= e($r['link'][0]) ?> <i class="fa-solid fa-arrow-right"></i></a>
-                            <?php endif; ?>
-                        </li>
-                    <?php endforeach; ?>
-                </ol>
-            <?php elseif (!$a['products']): ?>
-                <div class="empty"><i class="fa-solid fa-seedling"></i><strong>Nothing to learn from yet</strong>Add items, receive stock and log waste, and recommendations will appear here.</div>
-            <?php else: ?>
-                <div class="empty"><i class="fa-solid fa-circle-check"></i><strong>No recommendations</strong>Stock is on track to sell before it expires, and nothing stands out in the last <?= ADVISOR_WINDOW_DAYS ?> days.</div>
-            <?php endif; ?>
+            <ul class="hbar-list score-parts">
+                <?php foreach ($score['parts'] as $part): $pct = round($part['points'] / $part['max'] * 100); ?>
+                    <li class="hbar-row">
+                        <span class="name"><?= e($part['label']) ?></span>
+                        <span class="val"><?= number_format($part['points'], 0) ?> / <?= $part['max'] ?></span>
+                        <span class="hbar-track"><span class="hbar-fill" style="display:block;width:<?= $pct ?>%;background:var(--<?= $pct >= 80 ? 'g-500' : ($pct >= 50 ? 'c-waste' : 'c-loss') ?>)"></span></span>
+                        <span class="hbar-note"><?= e($part['detail']) ?></span>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
         </div>
     </div>
+<?php endif; ?>
 
-    <div class="stack">
-        <div class="card ask-card">
-            <div class="card-head">
-                <div>
-                    <div class="card-title"><i class="fa-solid fa-robot"></i> Ask the advisor</div>
-                    <div class="card-sub"><?= $aiOn ? 'Powered by Claude AI · answers from this store\'s records' : 'Built-in answers from this store\'s records' ?></div>
-                </div>
-                <?php if ($aiOn): ?>
-                    <button type="button" class="btn btn-sm btn-ghost" id="newChat" title="Start over: the advisor forgets this conversation"><i class="fa-solid fa-plus"></i> New chat</button>
-                <?php endif; ?>
-            </div>
-            <div class="card-body">
-                <div class="ask-log" id="askLog" aria-live="polite">
-                    <div class="ask-msg bot">
-                        <p>Hi <?= e($user['username']) ?>. I've analysed your stock and waste.
-                            <?php if ($score): ?>Your Zero-Waste Score is <strong><?= $score['score'] ?>/100</strong> (<?= e($score['grade'][1]) ?>).<?php endif; ?>
-                        </p>
-                        <?php if ($aiOn): ?>
-                            <p>Ask me anything about the store in your own words: what's in stock, what is expiring, what we waste and why, suppliers, deliveries, or what to order.</p>
-                        <?php else: ?>
-                            <p>Ask me what's in stock, what to do today, what will expire unsold, how much to order, or about any item by name.</p>
-                        <?php endif; ?>
-                    </div>
-                    <?php foreach ($chat as $turn): ?>
-                        <div class="ask-msg user"><?= e($turn['question']) ?></div>
-                        <div class="ask-msg bot"><?= advisor_ai_render($turn['answer']) ?></div>
-                    <?php endforeach; ?>
-                </div>
-                <div class="ask-chips">
-                    <?php foreach (ADVISOR_SUGGESTIONS as $s): ?>
-                        <button type="button" class="ask-chip" data-ask="<?= e($s) ?>"><?= e($s) ?></button>
-                    <?php endforeach; ?>
-                </div>
-                <form class="ask-form" id="askForm" autocomplete="off">
-                    <input class="input" type="text" id="askInput" maxlength="500" placeholder="e.g. How many items are in stock?" aria-label="Your question">
-                    <button class="btn btn-primary" type="submit" id="askBtn"><i class="fa-solid fa-paper-plane"></i><span class="hide-sm">Ask</span></button>
-                </form>
-            </div>
+<div class="card ask-card" style="margin-top:18px">
+    <div class="card-head">
+        <div>
+            <div class="card-title"><i class="fa-solid fa-robot"></i> Ask the advisor</div>
+            <div class="card-sub"><?= $aiOn ? 'Powered by Claude AI · answers from this store\'s records' : 'Built-in answers from this store\'s records' ?></div>
         </div>
-
-        <?php if ($score): ?>
-            <div class="card">
-                <div class="card-head">
-                    <div>
-                        <div class="card-title"><i class="fa-solid fa-gauge-high"></i> How the score is made</div>
-                        <div class="card-sub"><?= $score['score'] ?> of 100 · <?= $score['score'] >= 85 ? 'near zero waste' : (85 - $score['score']) . ' points to near zero waste (85)' ?></div>
-                    </div>
+        <?php if ($aiOn): ?>
+            <button type="button" class="btn btn-sm btn-ghost" id="newChat" title="Start over: the advisor forgets this conversation"><i class="fa-solid fa-plus"></i> New chat</button>
+        <?php endif; ?>
+    </div>
+    <div class="card-body ask-layout">
+        <div class="ask-main">
+            <div class="ask-log" id="askLog" aria-live="polite">
+                <div class="ask-msg bot">
+                    <p>Hi <?= e($user['username']) ?>. I've analysed your stock and waste.
+                        <?php if ($score): ?>Your Zero-Waste Score is <strong><?= $score['score'] ?>/100</strong> (<?= e($score['grade'][1]) ?>).<?php endif; ?>
+                    </p>
+                    <?php if ($aiOn): ?>
+                        <p>Ask me anything about the store in your own words: what's in stock, what is expiring, what we waste and why, suppliers, deliveries, or what to order.</p>
+                    <?php else: ?>
+                        <p>Ask me what's in stock, what to do today, what will expire unsold, how much to order, or about any item by name.</p>
+                    <?php endif; ?>
                 </div>
-                <div class="card-body">
-                    <ul class="hbar-list">
-                        <?php foreach ($score['parts'] as $part): $pct = round($part['points'] / $part['max'] * 100); ?>
-                            <li class="hbar-row">
-                                <span class="name"><?= e($part['label']) ?></span>
-                                <span class="val"><?= number_format($part['points'], 0) ?> / <?= $part['max'] ?></span>
-                                <span class="hbar-track"><span class="hbar-fill" style="display:block;width:<?= $pct ?>%;background:var(--<?= $pct >= 80 ? 'g-500' : ($pct >= 50 ? 'c-waste' : 'c-loss') ?>)"></span></span>
-                                <span class="hbar-note"><?= e($part['detail']) ?></span>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                </div>
+                <?php foreach ($chat as $turn): ?>
+                    <div class="ask-msg user"><?= e($turn['question']) ?></div>
+                    <div class="ask-msg bot"><?= advisor_ai_render($turn['answer']) ?></div>
+                <?php endforeach; ?>
             </div>
+            <form class="ask-form" id="askForm" autocomplete="off">
+                <input class="input" type="text" id="askInput" maxlength="500" placeholder="e.g. How many items are in stock?" aria-label="Your question">
+                <button class="btn btn-primary" type="submit" id="askBtn"><i class="fa-solid fa-paper-plane"></i><span class="hide-sm">Ask</span></button>
+            </form>
+        </div>
+        <aside class="ask-side" aria-label="Suggested questions">
+            <div class="ask-side-title">Try asking</div>
+            <div class="ask-chips">
+                <?php foreach (ADVISOR_SUGGESTIONS as $s): ?>
+                    <button type="button" class="ask-chip" data-ask="<?= e($s) ?>"><?= e($s) ?></button>
+                <?php endforeach; ?>
+            </div>
+            <p class="ask-tip"><i class="fa-regular fa-lightbulb"></i>
+                <?= $aiOn ? 'Follow-up questions work too, for example "and last month?". You can write in English, Filipino or Taglish.' : 'Ask about any item by name, for example "How much milk is in stock?".' ?>
+            </p>
+        </aside>
+    </div>
+</div>
+
+<div class="card" style="margin-top:18px">
+    <div class="card-head">
+        <div>
+            <div class="card-title"><i class="fa-solid fa-list-check"></i> Recommendations</div>
+            <div class="card-sub"><?= $todo ? advisor_plural($todo, 'action') . ', most important first' : 'Nothing to fix right now' ?></div>
+        </div>
+        <?php if ($recs): $byPriority = array_count_values(array_column($recs, 'priority')); ?>
+            <div class="rec-counts">
+                <?php foreach (ADVISOR_PRIORITIES as $key => [$label, $tone]): if (!empty($byPriority[$key])): ?>
+                    <span class="chip chip-<?= e($tone) ?>"><?= (int) $byPriority[$key] ?> <?= e(strtolower(str_replace(' priority', '', $label))) ?></span>
+                <?php endif; endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </div>
+    <div class="card-body">
+        <?php if ($recs): ?>
+            <ol class="rec-list">
+                <?php foreach ($recs as $r): [$label, $tone] = ADVISOR_PRIORITIES[$r['priority']]; ?>
+                    <li class="rec rec-<?= e($r['priority']) ?>">
+                        <div class="rec-head">
+                            <span class="rec-icon tone-<?= e($tone) ?>"><i class="fa-solid <?= e($r['icon']) ?>"></i></span>
+                            <div>
+                                <h3 class="rec-title"><?= e($r['title']) ?></h3>
+                                <div class="rec-meta">
+                                    <span class="chip chip-<?= e($tone) ?>"><?= e($label) ?></span>
+                                    <?php if ($r['impact']): ?><span class="chip chip-gray"><?= peso($r['impact'], 0) ?> <?= e($r['impact_label']) ?></span><?php endif; ?>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="rec-why"><?= advisor_text($r['why']) ?></p>
+                        <?php if ($r['actions']): ?>
+                            <ul class="rec-actions">
+                                <?php foreach ($r['actions'] as $action): ?><li><?= advisor_text($action) ?></li><?php endforeach; ?>
+                            </ul>
+                        <?php endif; ?>
+                        <?php if ($r['link']): ?>
+                            <a class="btn btn-sm" href="<?= e($r['link'][1]) ?>"><?= e($r['link'][0]) ?> <i class="fa-solid fa-arrow-right"></i></a>
+                        <?php endif; ?>
+                    </li>
+                <?php endforeach; ?>
+            </ol>
+        <?php elseif (!$a['products']): ?>
+            <div class="empty"><i class="fa-solid fa-seedling"></i><strong>Nothing to learn from yet</strong>Add items, receive stock and log waste, and recommendations will appear here.</div>
+        <?php else: ?>
+            <div class="empty"><i class="fa-solid fa-circle-check"></i><strong>No recommendations</strong>Stock is on track to sell before it expires, and nothing stands out in the last <?= ADVISOR_WINDOW_DAYS ?> days.</div>
         <?php endif; ?>
     </div>
 </div>
