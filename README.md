@@ -18,7 +18,7 @@ Built with plain PHP and MySQL. There is no framework, no build step and no Comp
 - **AI Waste Advisor (admins and managers):** works out a Zero-Waste Score, ranked recommendations to cut waste (what to mark down or donate, what to order less of, storage and supplier fixes), an expiry forecast of stock that won't sell in time, and safe order sizes, all on the server from the system's own records. Its **Ask the advisor** chat is answered by **Claude** (Anthropic's AI) when an API key is set: ask anything about the store in plain English, Filipino or Taglish ("How many items are in stock?", "Which supplier wastes the most?", "Anong deliveries ang darating bukas?"). Claude looks up the records it needs through read-only lookups, so it can't change data. Without a key the chat uses built-in answers and nothing leaves the server.
 
 **Store front page (public)**
-- `front_page.php`: the store's photo as the background, its name and taglines, how the near-expiry markdowns work (20% off two days before, 50% off on the last day) and the zero-waste promise. It lists no products and takes no orders. Staff reach the sign-in page from its **Log in** button.
+- `front_page.php`: one screen with no scrolling on laptops and desktops: the store's photo as the background, its name and taglines, "Less waste, lower prices" and the zero-waste promise. It lists no products and takes no orders. Staff reach the sign-in page from its **Log in** button.
 
 ## User roles
 
