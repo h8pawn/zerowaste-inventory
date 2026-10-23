@@ -58,7 +58,7 @@ body {
 }
 a { color: var(--accent); }
 h1, h2, h3 { margin: 0; line-height: 1.15; }
-.wrap { width: min(1200px, calc(100% - 32px)); margin: 0 auto; }
+.wrap { width: min(1280px, calc(100% - 32px)); margin: 0 auto; }
 :focus-visible { outline: 3px solid rgba(22, 146, 91, .4); outline-offset: 2px; }
 
 /* ---------- Header ---------- */
