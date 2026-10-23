@@ -163,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             try {
                 db_exec('SET FOREIGN_KEY_CHECKS = 0');
                 db_transaction(function () {
-                    foreach (['customer_order_items', 'customer_orders', 'item_returns', 'stock_receipts', 'waste_logs', 'supplier_delivery_events', 'supplier_deliveries', 'food_items', 'products', 'suppliers'] as $table) {
+                    foreach (['item_returns', 'stock_receipts', 'waste_logs', 'supplier_delivery_events', 'supplier_deliveries', 'food_items', 'products', 'suppliers'] as $table) {
                         if (db_table_exists($table)) {
                             db_exec("DELETE FROM `$table`");
                         }
@@ -264,7 +264,7 @@ page_header(
     <div class="card-head" style="padding-bottom:14px">
         <div>
             <div class="card-title"><i class="fa-solid fa-user-shield"></i> All accounts</div>
-            <div class="card-sub">Staff: view and print only · Managers: add items, suppliers and users, delete accounts · Admins: everything, including admin accounts and store settings</div>
+            <div class="card-sub">Staff: view and print only · Managers: add items, suppliers and users, delete accounts, use the AI Waste Advisor · Admins: everything, including admin accounts and resetting system data</div>
         </div>
     </div>
     <div class="table-scroll">
@@ -344,7 +344,7 @@ page_header(
     <div class="card-head">
         <div>
             <div class="card-title"><i class="fa-solid fa-triangle-exclamation" style="color:var(--red-fg)"></i> Danger zone — reset system data</div>
-            <div class="card-sub">Permanently deletes all food items (including the archive), product templates, suppliers and their deliveries, waste logs, returns, stock receipts and online orders. Users, categories, waste reasons and store settings are kept.</div>
+            <div class="card-sub">Permanently deletes all food items (including the archive), product templates, suppliers and their deliveries, waste logs, supplier returns and stock receipts. Users, categories and waste reasons are kept.</div>
         </div>
     </div>
     <div class="card-body">

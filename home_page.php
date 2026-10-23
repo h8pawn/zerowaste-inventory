@@ -54,7 +54,6 @@ $lowStock = db_all(
 /* ---------- Monthly series (last 6 months, empty months included) ---------- */
 //   Cost  = stock received, valued at purchase price
 //   Waste = value of everything logged as waste
-//   Loss  = waste + supplier returns that were not fully credited back
 $sinceSql = "DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 5 MONTH)";
 $wasteRows = array_column(db_all(
     "SELECT DATE_FORMAT(waste_date, '%Y-%m') AS ym, SUM(quantity_wasted) AS units, SUM(estimated_value) AS value
@@ -64,11 +63,6 @@ $costRows = array_column(db_all(
     "SELECT DATE_FORMAT(received_at, '%Y-%m') AS ym, SUM(quantity * unit_cost) AS v
      FROM stock_receipts WHERE received_at >= $sinceSql GROUP BY ym"
 ), 'v', 'ym');
-$supplierRows = array_column(db_all(
-    "SELECT DATE_FORMAT(return_date, '%Y-%m') AS ym,
-            SUM(GREATEST(quantity * unit_value - amount, 0)) AS unrecovered, SUM(amount) AS credits
-     FROM item_returns WHERE return_type = 'supplier' AND return_date >= $sinceSql GROUP BY ym"
-), null, 'ym');
 
 $months = [];
 $monthStart = new DateTimeImmutable('first day of this month');
@@ -77,17 +71,13 @@ for ($i = 5; $i >= 0; $i--) {
     $key = $m->format('Y-m');
     $wasteValue = (float) ($wasteRows[$key]['value'] ?? 0);
     $cost = (float) ($costRows[$key] ?? 0);
-    $loss = $wasteValue + (float) ($supplierRows[$key]['unrecovered'] ?? 0);
     $months[] = [
         'label' => $m->format('M'),
         'full' => $m->format('F Y'),
         'units' => (int) ($wasteRows[$key]['units'] ?? 0),
         'cost' => $cost,
         'waste' => $wasteValue,
-        'loss' => $loss,
-        'recovered' => (float) ($supplierRows[$key]['credits'] ?? 0),
         'waste_rate' => $cost > 0 ? $wasteValue / $cost * 100 : null,
-        'loss_rate' => $cost > 0 ? $loss / $cost * 100 : null,
     ];
 }
 $now = $months[5];
@@ -97,7 +87,7 @@ $unitsMax = max(1, max(array_column($months, 'units')));
 $unitsPct = $prev['units'] > 0 ? round(($now['units'] - $prev['units']) / $prev['units'] * 100, 1) : null;
 
 // Rate chart scale: round the highest rate up to a readable step.
-$rateMax = max(array_filter(array_merge(array_column($months, 'loss_rate'), [1]), fn ($v) => $v !== null));
+$rateMax = max(array_filter(array_merge(array_column($months, 'waste_rate'), [1]), fn ($v) => $v !== null));
 $rateStep = $rateMax <= 10 ? 5 : ($rateMax <= 40 ? 10 : ($rateMax <= 100 ? 25 : 50));
 $rateTop = max($rateStep, (int) ceil($rateMax / $rateStep) * $rateStep);
 
@@ -114,12 +104,11 @@ function money_change(float $now, float $before, bool $upIsBad = true): string {
 }
 
 /* ---------- Where this month's stock money went (donut) ---------- */
-$otherLoss = max(0, $now['loss'] - $now['waste']);
-$moneyTotal = max($now['cost'], $now['loss']);
+$moneyTotal = max($now['cost'], $now['waste']);
+$kept = max(0, $moneyTotal - $now['waste']);
 $moneySlices = [
-    ['label' => 'Kept / sellable', 'value' => max(0, $moneyTotal - $now['loss']), 'color' => 'var(--c-kept)', 'display' => peso(max(0, $moneyTotal - $now['loss']), 0)],
+    ['label' => 'Kept / sellable', 'value' => $kept, 'color' => 'var(--c-kept)', 'display' => peso($kept, 0)],
     ['label' => 'Wasted', 'value' => $now['waste'], 'color' => 'var(--c-waste)', 'display' => peso($now['waste'], 0)],
-    ['label' => 'Unrecovered returns', 'value' => $otherLoss, 'color' => 'var(--c-loss)', 'display' => peso($otherLoss, 0)],
 ];
 
 /* ---------- Waste by reason this month (donut: top 3 + Other) ---------- */
@@ -152,13 +141,6 @@ $recentWaste = db_all(
      LIMIT 5"
 );
 
-$openOrders = db_one(
-    "SELECT COUNT(*) AS open_count,
-            COALESCE(SUM(status = 'pending'), 0) AS new_count,
-            COALESCE(SUM(pickup_date = CURDATE()), 0) AS today_count
-     FROM customer_orders WHERE status IN ('pending', 'ready')"
-);
-
 $deliveryCounts = delivery_counts();
 
 $hour = (int) date('G');
@@ -171,7 +153,7 @@ $actions = can_manage($user)
         . '<a href="log_waste.php" class="btn btn-primary"><i class="fa-solid fa-trash-can"></i> Log Waste</a>'
     : '<a href="food_items.php" class="btn"><i class="fa-solid fa-print"></i> Print labels</a>'
         . '<a href="reports.php" class="btn btn-primary"><i class="fa-solid fa-chart-column"></i> Reports</a>';
-if (is_admin($user)) {
+if (can_manage($user)) {
     $actions = '<a href="ai_advisor.php" class="btn"><i class="fa-solid fa-robot"></i> AI Advisor</a>' . $actions;
 }
 page_header('Dashboard', $greeting . ', ' . $user['username'] . ' · ' . date('l, F j, Y'), $actions);
@@ -182,17 +164,6 @@ page_header('Dashboard', $greeting . ', ' . $user['username'] . ' · ' . date('l
         <i class="fa-solid fa-triangle-exclamation"></i>
         <span><?= count($expiring) ?> item<?= count($expiring) === 1 ? '' : 's' ?> expire within <?= EXPIRING_SOON_DAYS ?> days. Mark them down or use them before they turn into waste.</span>
         <a href="food_items.php?status=expiring" class="btn btn-sm">Review</a>
-    </div>
-<?php endif; ?>
-
-<?php if ((int) $openOrders['open_count'] > 0): ?>
-    <div class="alert alert-info">
-        <i class="fa-solid fa-basket-shopping"></i>
-        <span>
-            <?= (int) $openOrders['open_count'] ?> online pickup order<?= (int) $openOrders['open_count'] === 1 ? '' : 's' ?> open
-            (<?= (int) $openOrders['new_count'] ?> new, <?= (int) $openOrders['today_count'] ?> for pickup today).
-        </span>
-        <a href="orders.php" class="btn btn-sm">View orders</a>
     </div>
 <?php endif; ?>
 
@@ -250,8 +221,8 @@ $deliveryParts = array_filter([
 <div class="card" style="margin-top:18px">
     <div class="card-head">
         <div>
-            <div class="card-title"><i class="fa-solid fa-scale-balanced"></i> Cost vs Waste vs Loss · <?= e($now['full']) ?></div>
-            <div class="card-sub">Cost = stock received · Waste = value thrown out · Loss = waste + supplier returns not credited back</div>
+            <div class="card-title"><i class="fa-solid fa-scale-balanced"></i> Cost vs Waste · <?= e($now['full']) ?></div>
+            <div class="card-sub">Cost = stock received · Waste = value thrown out</div>
         </div>
         <a href="reports.php" class="btn btn-sm btn-ghost">Reports <i class="fa-solid fa-arrow-right"></i></a>
     </div>
@@ -270,11 +241,6 @@ $deliveryParts = array_filter([
                         <?= money_change($now['waste'], $prev['waste']) ?>
                         <div class="stat-sub"><?= $now['waste_rate'] !== null ? number_format($now['waste_rate'], 1) . '% of cost' : 'No stock received' ?> · last month <?= peso($prev['waste'], 0) ?></div>
                     </div>
-                    <div class="kpi-row loss">
-                        <div><div class="stat-label">Loss</div><div class="stat-value"><?= peso($now['loss'], 0) ?></div></div>
-                        <?= money_change($now['loss'], $prev['loss']) ?>
-                        <div class="stat-sub"><?= peso($now['recovered'], 0) ?> credit recovered · last month <?= peso($prev['loss'], 0) ?></div>
-                    </div>
                 </div>
             </section>
 
@@ -283,9 +249,9 @@ $deliveryParts = array_filter([
                 <?php if ($moneyTotal > 0): ?>
                     <?= donut_chart(
                         $moneySlices,
-                        $now['loss_rate'] !== null ? number_format($now['loss_rate'], 1) . '%' : peso($now['loss'], 0),
-                        $now['loss_rate'] !== null ? 'of cost lost' : 'lost',
-                        'Share of this month\'s stock cost that was kept, wasted, or lost to unrecovered returns'
+                        $now['waste_rate'] !== null ? number_format($now['waste_rate'], 1) . '%' : peso($now['waste'], 0),
+                        $now['waste_rate'] !== null ? 'of cost wasted' : 'wasted',
+                        'Share of this month\'s stock cost that was kept or wasted'
                     ) ?>
                 <?php else: ?>
                     <div class="empty"><i class="fa-solid fa-chart-pie"></i><strong>No stock received this month</strong></div>
@@ -293,24 +259,18 @@ $deliveryParts = array_filter([
             </section>
 
             <section>
-                <h3>Waste &amp; loss as % of cost</h3>
-                <div class="legend" style="margin-bottom:8px">
-                    <span><i style="background:var(--c-waste)"></i>Waste</span>
-                    <span><i style="background:var(--c-loss)"></i>Loss</span>
-                </div>
-                <div class="rate-chart" role="img" aria-label="Waste and loss as a percentage of cost, last 6 months">
+                <h3>Waste as % of cost</h3>
+                <div class="rate-chart" role="img" aria-label="Waste as a percentage of cost, last 6 months">
                     <?php foreach ([$rateTop, $rateTop / 2] as $g): ?>
                         <div class="gridline" style="bottom: calc((100% - 18px) * <?= round($g / $rateTop, 3) ?>)"><span><?= rtrim(rtrim(number_format($g, 1), '0'), '.') ?>%</span></div>
                     <?php endforeach; ?>
                     <?php foreach ($months as $i => $m):
+                        $rate = $m['waste_rate'];
                         $tip = $m['full'] . "\nCost " . peso($m['cost'], 0) . "\nWaste " . peso($m['waste'], 0)
-                            . ($m['waste_rate'] !== null ? ' (' . number_format($m['waste_rate'], 1) . '%)' : '')
-                            . "\nLoss " . peso($m['loss'], 0) . ($m['loss_rate'] !== null ? ' (' . number_format($m['loss_rate'], 1) . '%)' : '');
+                            . ($rate !== null ? ' (' . number_format($rate, 1) . '%)' : '');
                         ?>
                         <div class="rate-month" data-tip="<?= e($tip) ?>" tabindex="0">
-                            <?php foreach (['waste', 'loss'] as $kind): $rate = $m[$kind . '_rate']; ?>
-                                <div class="rate-bar <?= $kind ?>" style="height: calc((100% - 18px) * <?= $rate !== null ? round(min($rate, $rateTop) / $rateTop, 3) : 0 ?>)"></div>
-                            <?php endforeach; ?>
+                            <div class="rate-bar waste" style="height: calc((100% - 18px) * <?= $rate !== null ? round(min($rate, $rateTop) / $rateTop, 3) : 0 ?>)"></div>
                         </div>
                     <?php endforeach; ?>
                 </div>
@@ -319,9 +279,8 @@ $deliveryParts = array_filter([
                 </div>
                 <?php if ($now['waste_rate'] !== null): ?>
                     <p class="rate-caption">
-                        <?= e($now['label']) ?>: <strong><?= number_format($now['waste_rate'], 1) ?>%</strong> wasted,
-                        <strong><?= number_format($now['loss_rate'], 1) ?>%</strong> lost
-                        <?php if ($prev['waste_rate'] !== null): ?>· <?= e($prev['label']) ?>: <?= number_format($prev['waste_rate'], 1) ?>% / <?= number_format($prev['loss_rate'], 1) ?>%<?php endif; ?>
+                        <?= e($now['label']) ?>: <strong><?= number_format($now['waste_rate'], 1) ?>%</strong> wasted
+                        <?php if ($prev['waste_rate'] !== null): ?>· <?= e($prev['label']) ?>: <?= number_format($prev['waste_rate'], 1) ?>%<?php endif; ?>
                     </p>
                 <?php endif; ?>
             </section>

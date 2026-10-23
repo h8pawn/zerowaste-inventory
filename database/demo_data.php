@@ -1,5 +1,5 @@
 <?php
-// Sample inventory, sales, waste, returns and orders for trying out the AI Waste Advisor and the
+// Sample inventory, sales, waste and supplier returns for trying out the AI Waste Advisor and the
 // dashboards. Dates are relative to the day it runs, so the samples always look current.
 // Command line only, and only into an empty inventory so it never mixes with real records:
 //
@@ -14,7 +14,6 @@ if (PHP_SAPI !== 'cli') {
 
 require_once __DIR__ . '/../includes/app.php';
 require_once __DIR__ . '/../includes/barcode.php';
-require_once __DIR__ . '/../includes/store.php';
 
 if ((int) db_value('SELECT COUNT(*) FROM food_items') > 0) {
     fwrite(STDERR, "The inventory already has items, so no demo data was added.\n"
@@ -48,14 +47,14 @@ $supplier = function (string $name, string $contact, string $phone, string $addr
 };
 
 // One batch. $expires and $added are days from today; archived batches are expired and empty.
-$item = function (string $name, string $cat, int $qty, string $unit, ?float $price, int $expires, string $storage, ?int $supplierId, int $added, bool $archived = false, bool $listed = true) use ($day, $at, $category): int {
+$item = function (string $name, string $cat, int $qty, string $unit, ?float $price, int $expires, string $storage, ?int $supplierId, int $added, bool $archived = false) use ($day, $at, $category): int {
     db_exec(
         'INSERT INTO food_items (name, barcode, category_id, quantity, unit, purchase_price, expiration_date, storage_location, supplier_id,
-                                 added_date, archived_at, archive_reason, is_listed)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        'ssiisdssisssi',
+                                 added_date, archived_at, archive_reason)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'ssiisdssisss',
         [$name, generate_store_barcode(), $category($cat), $qty, $unit, $price, $day($expires), $storage, $supplierId, $at($added),
-            $archived ? $day($expires) . ' 23:00:00' : null, $archived ? 'expired' : null, $listed ? 1 : 0]
+            $archived ? $day($expires) . ' 23:00:00' : null, $archived ? 'expired' : null]
     );
     return db_last_id();
 };
@@ -79,7 +78,7 @@ $waste = function (int $itemId, int $qty, string $reason, int $daysAgo, float $u
 };
 $autoNote = fn (int $expiredDaysAgo): string => 'Auto-moved by system after expiration date (' . $day($expiredDaysAgo) . ').';
 
-db_transaction(function () use ($supplier, $item, $receive, $waste, $autoNote, $day, $at, $adminId) {
+db_transaction(function () use ($supplier, $item, $receive, $waste, $autoNote, $day, $adminId) {
     $freshFarm = $supplier('FreshFarm Produce', 'Mang Romy Dela Cruz', '0917 555 0101', 'Balintawak Market, Quezon City');
     $goldenDairy = $supplier('Golden Dairy Co.', 'Ms. Liza Santos', '0918 555 0202', 'Marilao, Bulacan');
     $lolas = $supplier('Lola\'s Bakery', 'Aling Nena Reyes', '0919 555 0303', 'Brgy. San Roque, Marikina');
@@ -96,7 +95,7 @@ db_transaction(function () use ($supplier, $item, $receive, $waste, $autoNote, $
     $b = $item('Banana Lakatan', 'Fruits', 40, 'pcs', 6, 2, 'Shelf A', $freshFarm, -4);
     $receive($b, 60, 6, -4, 'initial');
 
-    // Milk: restocked in place; some will expire this week; 4 bottles reserved for pickup.
+    // Milk: restocked in place; some will expire this week.
     $milk = $item('Fresh Milk 1L', 'Dairy', 30, 'bottle', 85, 5, 'Chiller 1', $goldenDairy, -60);
     $receive($milk, 60, 85, -60, 'initial');
     foreach ([[-40, 60], [-20, 60], [-3, 30]] as [$ago, $qty]) {
@@ -125,8 +124,8 @@ db_transaction(function () use ($supplier, $item, $receive, $waste, $autoNote, $
     $s = $item('Canned Sardines', 'Pantry', 80, 'can', 22, 25, 'Aisle 3', $metro, -70);
     $receive($s, 100, 22, -70, 'initial');
 
-    // Cheddar: expiring but switched off on the storefront → "List on the storefront".
-    $c = $item('Cheddar Cheese', 'Dairy', 8, 'block', 120, 2, 'Chiller 1', $goldenDairy, -30, false, false);
+    // Cheddar: a slow seller expiring in 2 days → "Sell or donate" this week.
+    $c = $item('Cheddar Cheese', 'Dairy', 8, 'block', 120, 2, 'Chiller 1', $goldenDairy, -30);
     $receive($c, 20, 120, -30, 'initial');
 
     // Chicken: no purchase price and no supplier → "Give the advisor better data".
@@ -141,8 +140,8 @@ db_transaction(function () use ($supplier, $item, $receive, $waste, $autoNote, $
     $waste($t, 10, 'Quality Control', -14, 15, 'Bruised on arrival');
     $waste($t, 4, 'Damaged/Spoiled', -5, 15);
     db_exec(
-        "INSERT INTO item_returns (food_item_id, return_type, outcome, quantity, unit_value, amount, reason, return_date, user_id)
-         VALUES (?, 'supplier', 'sent_back', 10, 15, 50, 'Soft and bruised', ?, ?)",
+        "INSERT INTO item_returns (food_item_id, quantity, unit_value, amount, reason, return_date, user_id)
+         VALUES (?, 10, 15, 50, 'Soft and bruised', ?, ?)",
         'isi',
         [$t, $day(-12), $adminId]
     );
@@ -173,38 +172,14 @@ db_transaction(function () use ($supplier, $item, $receive, $waste, $autoNote, $
     $pork = $item('Pork Liempo', 'Meat/Seafood', 8, 'kg', 320, 45, 'Freezer', $meats, -40);
     $receive($pork, 15, 320, -40, 'initial');
     $receive($pork, 15, 320, -15);
-
-    // Online pickup orders: two picked up, one still open and holding 4 bottles of milk.
-    $order = function (string $name, string $phone, int $pickupDay, string $status, array $lines) use ($day, $at, $adminId): void {
-        $total = array_sum(array_map(fn ($l) => $l[2] * $l[3], $lines));
-        db_exec(
-            'INSERT INTO customer_orders (code, customer_name, phone, pickup_date, pickup_time, payment_method, status, total, handled_by, completed_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            'sssssssdis',
-            [new_order_code(), $name, $phone, $day($pickupDay), '10:00', 'cash', $status, $total, $status === 'completed' ? $adminId : null,
-                $status === 'completed' ? $at($pickupDay) : null]
-        );
-        $orderId = db_last_id();
-        foreach ($lines as [$itemId, $itemName, $qty, $price]) {
-            db_exec(
-                'INSERT INTO customer_order_items (order_id, food_item_id, item_name, unit, quantity, regular_price, unit_price, line_total)
-                 VALUES (?, ?, ?, NULL, ?, ?, ?, ?)',
-                'iisiddd',
-                [$orderId, $itemId, $itemName, $qty, $price, $price, $qty * $price]
-            );
-        }
-    };
-    $order('Ana Villanueva', '09170000001', -5, 'completed', [[$milk, 'Fresh Milk 1L', 2, 106.25], [$noodles, 'Instant Noodles', 6, 17.50]]);
-    $order('Ben Ramos', '09170000002', -2, 'completed', [[$soda, 'Soft Drink 1.5L', 2, 81.25]]);
-    $order('Cara Mendoza', '09170000003', 1, 'pending', [[$milk, 'Fresh Milk 1L', 4, 106.25]]);
 });
 
 $counts = db_one(
     'SELECT (SELECT COUNT(DISTINCT name) FROM food_items) AS products, (SELECT COUNT(*) FROM food_items) AS batches,
             (SELECT COUNT(*) FROM waste_logs) AS waste, (SELECT COUNT(*) FROM stock_receipts) AS receipts,
-            (SELECT COUNT(*) FROM suppliers) AS suppliers, (SELECT COUNT(*) FROM customer_orders) AS orders'
+            (SELECT COUNT(*) FROM suppliers) AS suppliers'
 );
 echo "Demo data added: {$counts['products']} products ({$counts['batches']} batches), {$counts['receipts']} stock receipts, "
-    . "{$counts['waste']} waste entries, {$counts['suppliers']} suppliers, {$counts['orders']} online orders.\n"
-    . "Sign in as the admin and open Admin > AI Waste Advisor.\n"
+    . "{$counts['waste']} waste entries, {$counts['suppliers']} suppliers.\n"
+    . "Sign in as an admin or manager and open Admin > AI Waste Advisor.\n"
     . "To remove it: Users & System > Danger zone > Reset system data.\n";

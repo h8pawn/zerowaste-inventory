@@ -19,7 +19,7 @@ if ($noUsersYet && !$flashes) {
 render_head('Sign in', 'auth-body');
 ?>
     <section class="auth-hero">
-        <a class="brand" href="front_page.php">
+        <a class="brand" href="index.php">
             <span class="brand-logo">ZW</span>
             <span class="brand-text">
                 <strong><?= strtoupper(APP_NAME) ?></strong>
@@ -35,13 +35,12 @@ render_head('Sign in', 'auth-body');
                 <div class="auth-feature"><i class="fa-solid fa-chart-column"></i> Waste reports by item and reason</div>
             </div>
         </div>
-        <small style="opacity:.6">© <?= date('Y') ?> Lisa Grocery Store</small>
+        <small style="opacity:.6">© <?= date('Y') ?> <?= e(STORE_NAME) ?></small>
     </section>
 
     <section class="auth-panel">
         <div class="auth-card">
             <div class="auth-top">
-                <a href="front_page.php" class="btn btn-sm"><i class="fa-solid fa-store"></i> Store front</a>
                 <button type="button" class="btn btn-sm" data-theme-toggle title="Toggle dark mode"><i class="fa-solid fa-moon"></i></button>
             </div>
 

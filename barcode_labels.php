@@ -2,7 +2,6 @@
 // Printable barcode labels for one or more items: barcode_labels.php?ids=12,15&copies=3
 require_once __DIR__ . '/includes/app.php';
 require_once __DIR__ . '/includes/layout.php';
-require_once __DIR__ . '/includes/store.php';
 require_once __DIR__ . '/includes/barcode.php';
 
 $user = require_login();
@@ -29,7 +28,7 @@ if ($ids) {
 }
 $printable = array_values(array_filter($items, fn ($i) => $i['barcode'] !== null && is_printable_barcode($i['barcode'])));
 $missing = array_values(array_filter($items, fn ($i) => $i['barcode'] === null || !is_printable_barcode($i['barcode'])));
-$storeName = store_settings()['store_name'];
+$storeName = STORE_NAME;
 $labelCount = count($printable) * $copies;
 ?>
 <!DOCTYPE html>

@@ -155,14 +155,13 @@ function record_receipt(int $itemId, int $quantity, $unitCost, string $source, ?
     );
 }
 
-// Items with waste, return or order history can't be hard-deleted without losing that history.
+// Items with waste or return history can't be hard-deleted without losing that history.
 function item_has_history(int $itemId): bool {
     return (bool) db_value(
         'SELECT (SELECT COUNT(*) FROM waste_logs WHERE food_item_id = ?)
-              + (SELECT COUNT(*) FROM item_returns WHERE food_item_id = ?)
-              + (SELECT COUNT(*) FROM customer_order_items WHERE food_item_id = ?)',
-        'iii',
-        [$itemId, $itemId, $itemId]
+              + (SELECT COUNT(*) FROM item_returns WHERE food_item_id = ?)',
+        'ii',
+        [$itemId, $itemId]
     );
 }
 

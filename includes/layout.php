@@ -5,6 +5,10 @@ require_once __DIR__ . '/deliveries.php';
 
 const APP_NAME = 'ZeroWaste';
 const APP_TAGLINE = 'Lisa Grocery · Ops';
+const STORE_NAME = 'Lisa Grocery Store';
+
+// Markup on the purchase price for items without their own selling price.
+const DEFAULT_MARKUP_PERCENT = 25;
 
 // Archived items (expired batches, discontinued or removed items) are hidden from
 // inventory lists and counts but keep their waste, return and cost history.
@@ -51,7 +55,6 @@ function nav_counts(array $user): array {
     ) ?? [];
 
     $counts['archived'] = (int) db_value('SELECT COUNT(*) FROM food_items WHERE archived_at IS NOT NULL');
-    $counts['orders_open'] = (int) db_value("SELECT COUNT(*) FROM customer_orders WHERE status IN ('pending', 'ready')");
     $counts['returns_month'] = (int) db_value("SELECT COUNT(*) FROM item_returns WHERE return_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')");
     $counts['waste_month'] = (int) db_value("SELECT COUNT(*) FROM waste_logs WHERE waste_date >= DATE_FORMAT(CURDATE(), '%Y-%m-01')");
     $counts['suppliers'] = (int) db_value('SELECT COUNT(*) FROM suppliers');
@@ -73,7 +76,7 @@ function nav_link(string $href, string $icon, string $label, bool $active, ?int 
 
 /**
  * Opens the app shell. $active is one of: dashboard, items, expiring, lowstock, archive,
- * log_waste, returns, history, reports, orders, suppliers, deliveries, advisor, admin, store_settings.
+ * log_waste, returns, history, reports, suppliers, deliveries, advisor, admin.
  */
 function render_shell_start(array $user, string $title, string $active): void {
     render_head($title, 'app-body');
@@ -128,7 +131,6 @@ function render_shell_start(array $user, string $title, string $active): void {
             <button class="pill-btn" type="button" data-theme-toggle title="Toggle dark mode">
                 <i class="fa-solid fa-moon"></i><span class="hide-sm">Theme</span>
             </button>
-            <a class="pill-btn hide-sm" href="front_page.php"><i class="fa-solid fa-store"></i>Store</a>
             <span class="user-pill" title="<?= e($user['email']) ?>">
                 <span class="avatar"><?= e($initial) ?></span>
                 <span class="hide-sm"><?= e($user['username']) ?></span>
@@ -156,20 +158,14 @@ function render_shell_start(array $user, string $title, string $active): void {
                 <?= nav_link('waste_history.php', 'fa-clock-rotate-left', 'Waste History', $active === 'history', $c['waste_month'] ?? 0, 'teal') ?>
                 <?= nav_link('reports.php', 'fa-chart-column', 'Reports', $active === 'reports') ?>
 
-                <div class="nav-label">Store</div>
-                <?= nav_link('orders.php', 'fa-basket-shopping', 'Online Orders', $active === 'orders', $c['orders_open'] ?? 0, 'amber') ?>
+                <div class="nav-label">Supply</div>
                 <?= nav_link('suppliers.php', 'fa-truck-field', 'Suppliers', $active === 'suppliers', $c['suppliers'] ?? 0, 'gray') ?>
                 <?= nav_link('deliveries.php', 'fa-truck-fast', 'Deliveries', $active === 'deliveries', $c['deliveries'] ?? 0, 'amber') ?>
 
                 <?php if (can_manage($user)): ?>
                     <div class="nav-label">Admin</div>
-                    <?php if (is_admin($user)): ?>
-                        <?= nav_link('ai_advisor.php', 'fa-robot', 'AI Waste Advisor', $active === 'advisor') ?>
-                    <?php endif; ?>
+                    <?= nav_link('ai_advisor.php', 'fa-robot', 'AI Waste Advisor', $active === 'advisor') ?>
                     <?= nav_link('admin_panel.php', 'fa-user-shield', is_admin($user) ? 'Users & System' : 'User Accounts', $active === 'admin', $c['pending_users'] ?? 0, 'red') ?>
-                    <?php if (is_admin($user)): ?>
-                        <?= nav_link('store_settings.php', 'fa-sliders', 'Store Settings', $active === 'store_settings') ?>
-                    <?php endif; ?>
                 <?php endif; ?>
             </nav>
 
@@ -282,4 +278,16 @@ function discount_percent(?int $daysLeft): int {
         2 => 20,
         default => 0,
     };
+}
+
+// Shelf price before any markdown. An explicit selling price wins; otherwise the default
+// markup is applied to the purchase price. Null = the item has no price at all.
+function retail_price($sellingPrice, $purchasePrice): ?float {
+    if ($sellingPrice !== null && $sellingPrice !== '') {
+        return round((float) $sellingPrice, 2);
+    }
+    if ($purchasePrice === null || $purchasePrice === '') {
+        return null;
+    }
+    return round((float) $purchasePrice * (1 + DEFAULT_MARKUP_PERCENT / 100), 2);
 }

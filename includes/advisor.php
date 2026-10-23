@@ -1,5 +1,5 @@
 <?php
-// AI Waste Advisor (admins only): studies this store's own records and recommends what to do
+// AI Waste Advisor (admins and managers): studies this store's own records and recommends what to do
 // next to bring waste down toward zero. It uses no outside service and no outside data: every
 // number comes from the database, and storage advice comes from the shelf-life profiles in
 // shelf_life.php.
@@ -10,11 +10,10 @@
 //   Forecast    batches sell in expiry order (first in, first out) at that pace; whatever
 //               cannot sell before its best-before date is predicted waste.
 //   Order size  what sells within one shelf life (30 days at most), minus the stock that will still sell.
-//   Rules       waste reasons, suppliers, storage, the storefront and trends are checked
-//               against fixed thresholds and turned into ranked recommendations.
+//   Rules       waste reasons, suppliers, storage and trends are checked against fixed
+//               thresholds and turned into ranked recommendations.
 
 require_once __DIR__ . '/shelf_life.php';
-require_once __DIR__ . '/store.php';
 
 const ADVISOR_WINDOW_DAYS = 90;    // history the advisor learns from
 const ADVISOR_HORIZON_DAYS = 30;   // how far ahead the expiry forecast looks
@@ -39,7 +38,7 @@ const ADVISOR_PLAYBOOKS = [
         'actions' => [
             'Order smaller amounts more often. The Smart order sizes table shows a safe maximum per item.',
             'Put the batch that expires first at the front of the shelf (first in, first out).',
-            'Check Expiring Soon every morning. The storefront marks items down automatically 2 days before their date.',
+            'Check Expiring Soon every morning and mark items down as suggested: 20% off 2 days before their date, 50% off on the last day.',
         ],
     ],
     'Damaged/Spoiled' => [
@@ -68,7 +67,7 @@ const ADVISOR_PLAYBOOKS = [
         'title' => 'Stock failing quality checks is a big share of waste',
         'actions' => [
             'Inspect deliveries before accepting them.',
-            'Send failed stock back to the supplier (Returns → To supplier) to recover credit.',
+            'Send failed stock back to the supplier (Returns) to recover credit.',
         ],
     ],
     'Unsaleable' => [
@@ -82,13 +81,6 @@ const ADVISOR_PLAYBOOKS = [
         'title' => 'Product recalls are a big share of waste',
         'actions' => [
             'Recalls are outside your control: record the supplier credit for recalled stock under Returns.',
-        ],
-    ],
-    'Customer Return' => [
-        'title' => 'Customer returns are a big share of waste',
-        'actions' => [
-            'Check best-before dates at the counter and when packing pickup orders.',
-            'Look for a pattern in the return reasons on the Returns page.',
         ],
     ],
     'Other' => [
@@ -144,29 +136,23 @@ function advisor_scale(float $value, float $best, float $worst): float {
 // sales pace and a first-in-first-out forecast for the batches on the shelf now.
 function advisor_products(string $since): array {
     $rows = db_all(
-        "SELECT fi.id, fi.name, fi.unit, fi.quantity, fi.purchase_price, fi.selling_price, fi.is_listed,
+        "SELECT fi.id, fi.name, fi.unit, fi.quantity, fi.purchase_price,
                 fi.expiration_date, DATEDIFF(fi.expiration_date, CURDATE()) AS days_left,
                 fi.storage_location, fi.archived_at IS NULL AS active, DATE(fi.added_date) AS added,
                 fi.supplier_id, s.name AS supplier, fc.name AS category,
                 COALESCE(rc.units, 0) AS received, rc.first_at,
                 -- Restocking moves the expiry date but not added_date, so measure from the last delivery.
                 DATEDIFF(fi.expiration_date, DATE(COALESCE(rc.last_at, fi.added_date))) AS shelf_days,
-                COALESCE(w.units, 0) AS wasted, COALESCE(rt.units, 0) AS sent_back,
-                COALESCE(rsv.reserved, 0) AS reserved
+                COALESCE(w.units, 0) AS wasted, COALESCE(rt.units, 0) AS sent_back
          FROM food_items fi
          JOIN food_categories fc ON fc.id = fi.category_id
          LEFT JOIN suppliers s ON s.id = fi.supplier_id
          LEFT JOIN (SELECT food_item_id, SUM(quantity) AS units, MIN(received_at) AS first_at, MAX(received_at) AS last_at
                     FROM stock_receipts GROUP BY food_item_id) rc ON rc.food_item_id = fi.id
-         LEFT JOIN (SELECT wl.food_item_id, SUM(wl.quantity_wasted) AS units
-                    FROM waste_logs wl
-                    -- Disposed customer returns never came out of stock.
-                    WHERE NOT EXISTS (SELECT 1 FROM item_returns r WHERE r.waste_log_id = wl.id)
-                    GROUP BY wl.food_item_id) w ON w.food_item_id = fi.id
+         LEFT JOIN (SELECT food_item_id, SUM(quantity_wasted) AS units
+                    FROM waste_logs GROUP BY food_item_id) w ON w.food_item_id = fi.id
          LEFT JOIN (SELECT food_item_id, SUM(quantity) AS units
-                    FROM item_returns WHERE outcome = 'sent_back'
-                    GROUP BY food_item_id) rt ON rt.food_item_id = fi.id
-         " . RESERVED_JOIN . "
+                    FROM item_returns GROUP BY food_item_id) rt ON rt.food_item_id = fi.id
          ORDER BY fi.expiration_date, fi.id"
     );
 
@@ -185,7 +171,7 @@ function advisor_products(string $since): array {
             'key' => $key, 'name' => $r['name'], 'unit' => $r['unit'], 'category' => $r['category'],
             'supplier' => $r['supplier'], 'storage' => (string) $r['storage_location'], 'active' => false,
             'received' => 0, 'wasted' => 0, 'sent_back' => 0, 'on_hand' => 0, 'first' => null,
-            'stock' => 0, 'reserved' => 0, 'batches' => [], 'unpriced' => false, 'shelf_samples' => [],
+            'stock' => 0, 'batches' => [], 'unpriced' => false, 'shelf_samples' => [],
             'recv90' => 0, 'waste90' => 0, 'value90' => 0.0, 'reasons90' => [],
         ];
         $p = &$products[$key];
@@ -210,24 +196,14 @@ function advisor_products(string $since): array {
             $p['storage'] = (string) $r['storage_location'];
             $p['unpriced'] = $p['unpriced'] || $r['purchase_price'] === null;
             if ((int) $r['quantity'] > 0) {
-                $qty = (int) $r['quantity'];
-                $hidden = null;
-                if (retail_price($r['selling_price'], $r['purchase_price']) === null) {
-                    $hidden = 'no_price';
-                } elseif ((int) $r['is_listed'] !== 1) {
-                    $hidden = 'hidden';
-                }
                 $p['batches'][] = [
                     'id' => (int) $r['id'],
-                    'quantity' => $qty,
-                    'reserved' => min($qty, (int) $r['reserved']),
+                    'quantity' => (int) $r['quantity'],
                     'days_left' => (int) $r['days_left'],
                     'expires' => $r['expiration_date'],
                     'price' => (float) ($r['purchase_price'] ?? 0),
-                    'hidden' => $hidden,
                 ];
-                $p['stock'] += $qty;
-                $p['reserved'] += min($qty, (int) $r['reserved']);
+                $p['stock'] += (int) $r['quantity'];
             }
         }
         unset($p);
@@ -272,19 +248,18 @@ function advisor_products(string $since): array {
 }
 
 // First in, first out: batches sell in expiry order at the product's pace, and whatever is
-// still on the shelf at the end of its last day is predicted waste. Reserved units count as sold.
+// still on the shelf at the end of its last day is predicted waste.
 function advisor_simulate(array &$p): void {
     $sold = 0.0;
     $p['leftover'] = 0;
     $p['sellable'] = 0;
     foreach ($p['batches'] as &$b) {
-        $free = $b['quantity'] - $b['reserved'];
         $capacity = $p['pace'] * (max(0, $b['days_left']) + 1);
-        $sells = min($free, max(0.0, $capacity - $sold));
+        $sells = min($b['quantity'], max(0.0, $capacity - $sold));
         $sold += $sells;
-        $b['leftover'] = (int) round($free - $sells);
+        $b['leftover'] = (int) round($b['quantity'] - $sells);
         $p['leftover'] += $b['leftover'];
-        $p['sellable'] += $free - $b['leftover'];
+        $p['sellable'] += $b['quantity'] - $b['leftover'];
     }
     unset($b);
 }
@@ -294,20 +269,14 @@ function advisor_batch_action(array $b): string {
     $days = $b['days_left'];
     $mostlyLeft = $b['quantity'] > 0 && $b['leftover'] / $b['quantity'] >= 0.5;
 
-    $text = match (true) {
+    return match (true) {
         $days <= 1 => 'Last selling day' . ($days === 1 ? ' is tomorrow' : '') . ': sell at 50% off, then donate what is left to a community pantry or compost it.',
-        $days === 2 => 'Move it to the front of the shelf. The storefront takes 20% off now and 50% off on its last day.',
+        $days === 2 => 'Move it to the front of the shelf and mark it 20% off now, then 50% off on its last day.',
         $days <= ADVISOR_URGENT_DAYS => $mostlyLeft
             ? 'Mark it down or bundle it with a fast seller now, and line up a donation for what won\'t sell.'
             : 'Display it up front and bundle it with a fast seller.',
-        default => 'Don\'t reorder until it sells down. Feature it on the storefront and at eye level.',
+        default => 'Don\'t reorder until it sells down. Display it at eye level.',
     };
-    if ($b['hidden'] === 'hidden' && $days <= ADVISOR_URGENT_DAYS) {
-        $text = 'It is hidden from the storefront: tick "Show on the online store" so the automatic deal can sell it. ' . $text;
-    } elseif ($b['hidden'] === 'no_price' && $days <= ADVISOR_URGENT_DAYS) {
-        $text = 'It has no price, so the storefront can\'t show it: add one. ' . $text;
-    }
-    return $text;
 }
 
 // Batches forecast to still be on the shelf when they expire within the horizon.
@@ -324,10 +293,10 @@ function advisor_forecast(array $products): array {
             }
             $rows[] = [
                 'product' => $p['key'], 'name' => $p['name'], 'unit' => $p['unit'], 'id' => $b['id'],
-                'quantity' => $b['quantity'], 'reserved' => $b['reserved'], 'days_left' => $b['days_left'],
+                'quantity' => $b['quantity'], 'days_left' => $b['days_left'],
                 'expires' => $b['expires'], 'leftover' => $b['leftover'], 'value' => $b['leftover'] * $b['price'],
                 'pace' => $p['pace'], 'confidence' => $p['too_new'] ? 'none' : $p['confidence'],
-                'hidden' => $b['hidden'], 'action' => advisor_batch_action($b),
+                'action' => advisor_batch_action($b),
             ];
         }
     }
@@ -413,7 +382,7 @@ function advisor_breakdown(string $by, string $since): array {
              FROM item_returns r
              JOIN food_items fi ON fi.id = r.food_item_id
              $join
-             WHERE r.return_type = 'supplier' AND r.return_date >= ?
+             WHERE r.return_date >= ?
              GROUP BY gid, gname",
             's',
             [$since]
@@ -520,7 +489,6 @@ function advisor_analyze(): array {
         'stock_value' => $stockValue,
         'at_risk_value' => array_sum(array_column($forecast, 'value')),
         'at_risk_units' => array_sum(array_column($forecast, 'leftover')),
-        'orders90' => (int) db_value("SELECT COUNT(*) FROM customer_orders WHERE status = 'completed' AND completed_at >= ?", 's', [$since]),
     ];
     $a['score'] = advisor_score($a);
     $a['recommendations'] = advisor_recommendations($a);
@@ -640,7 +608,7 @@ function advisor_recommendations(array $a): array {
             $actions[] = '**' . $r['name'] . '**: sells ' . advisor_pace($r['pace'], $r['unit']) . ', ' . $r['quantity']
                 . ' in stock until ' . advisor_day($r['expires']) . ', so about ' . advisor_qty($r['leftover'], $r['unit']) . ' would be left. Hold the next order.';
         }
-        $actions[] = 'Feature them on the storefront and at eye level so they sell down.';
+        $actions[] = 'Display them at eye level and bundle them with fast sellers so they sell down.';
         $value = array_sum(array_column($slow, 'value'));
         $add([
             'type' => 'slow',
@@ -803,40 +771,7 @@ function advisor_recommendations(array $a): array {
         $add($rec);
     }
 
-    // 7. Near-expiry stock the storefront can't show, so its automatic deal can't help.
-    $hidden = [];
-    foreach ($products as $p) {
-        foreach ($p['batches'] as $b) {
-            if ($b['hidden'] !== null && $b['days_left'] <= EXPIRING_SOON_DAYS && $b['quantity'] > $b['reserved']) {
-                $hidden[] = '**' . $p['name'] . '** (expires ' . advisor_day($b['expires']) . '): '
-                    . ($b['hidden'] === 'hidden' ? 'tick "Show on the online store".' : 'add a purchase or selling price.');
-            }
-        }
-    }
-    if ($hidden) {
-        $add([
-            'type' => 'storefront',
-            'priority' => 'medium',
-            'icon' => 'fa-store',
-            'title' => 'List ' . advisor_plural(count($hidden), 'expiring item') . ' on the storefront',
-            'why' => 'They expire within ' . EXPIRING_SOON_DAYS . ' days, but customers can\'t see them online, so the automatic 20% and 50% deals can\'t help sell them.',
-            'actions' => array_slice($hidden, 0, 6),
-            'link' => ['Expiring Soon', 'food_items.php?status=expiring'],
-        ]);
-    }
-    if ($urgent && !pickup_enabled()) {
-        $add([
-            'type' => 'storefront',
-            'priority' => 'medium',
-            'icon' => 'fa-basket-shopping',
-            'title' => 'Turn on online reservations',
-            'why' => 'Stock is about to expire, but customers can\'t reserve deals for pickup because online reservations are switched off.',
-            'actions' => ['Tick "Let customers reserve items for pickup" in Store Settings.'],
-            'link' => ['Store Settings', 'store_settings.php'],
-        ]);
-    }
-
-    // 8. Several batches on the shelf: the forecast assumes the oldest sells first.
+    // 7. Several batches on the shelf: the forecast assumes the oldest sells first.
     $fifo = [];
     foreach ($products as $p) {
         $b = $p['batches'];
@@ -861,7 +796,7 @@ function advisor_recommendations(array $a): array {
         ]);
     }
 
-    // 9. Direction of travel.
+    // 8. Direction of travel.
     if ($t['value_prev30'] > 0) {
         $change = ($t['value30'] - $t['value_prev30']) / $t['value_prev30'] * 100;
         if ($change >= 20) {
@@ -901,7 +836,7 @@ function advisor_recommendations(array $a): array {
         ]);
     }
 
-    // 10. Gaps in the data that limit what the advisor can see.
+    // 9. Gaps in the data that limit what the advisor can see.
     $active = array_filter($products, fn ($p) => $p['active']);
     $gaps = [];
     $unpriced = count(array_filter($active, fn ($p) => $p['unpriced']));

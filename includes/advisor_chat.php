@@ -1,5 +1,5 @@
 <?php
-// "Ask the advisor": answers an admin's typed question from the AI Waste Advisor's analysis
+// "Ask the advisor": answers an admin's or manager's typed question from the AI Waste Advisor's analysis
 // (includes/advisor.php). It matches the question to an item name or a question type and
 // replies only with facts from this store's records. Anything else gets "I only answer from
 // this store's records".
@@ -79,7 +79,7 @@ function advisor_answer(string $question, array $a): string {
         'today' => advisor_answer_today($a),
         'zero' => advisor_answer_zero($a),
         'help' => [
-            ['p', 'I\'m the ZeroWaste AI Advisor. I learn only from this store\'s records: inventory, stock received, sales, waste, returns, suppliers and orders. Nothing comes from outside the system.'],
+            ['p', 'I\'m the ZeroWaste AI Advisor. I learn only from this store\'s records: inventory, stock received, sales, waste, supplier returns and suppliers. Nothing comes from outside the system.'],
             ['p', 'Ask me what to do today, what will expire unsold, how much to order, which items, reasons, suppliers or categories waste the most, or about any item by name.'],
         ],
         default => [
@@ -153,7 +153,7 @@ function advisor_answer_product(array $p, array $others, bool $exact, array $a):
     if ($p['batches']) {
         $next = $p['batches'][0];
         $facts[] = 'In stock: ' . advisor_qty($p['stock'], $p['unit']) . ' in ' . advisor_plural(count($p['batches']), 'batch')
-            . ($p['reserved'] ? ' (' . $p['reserved'] . ' reserved for pickup)' : '') . '. Next expiry ' . advisor_day($next['expires'])
+            . '. Next expiry ' . advisor_day($next['expires'])
             . ' (' . advisor_plural(max(0, $next['days_left']), 'day') . ').';
     } else {
         $facts[] = $p['active'] ? 'Out of stock right now.' : 'No longer stocked (archived).';

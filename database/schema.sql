@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS suppliers (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Inventory. Archived items are hidden from lists but keep their history.
--- selling_price NULL = store default markup on purchase_price.
+-- selling_price NULL = the default markup on purchase_price.
 CREATE TABLE IF NOT EXISTS food_items (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
@@ -51,7 +51,6 @@ CREATE TABLE IF NOT EXISTS food_items (
     archived_at DATETIME NULL DEFAULT NULL,
     archive_reason VARCHAR(20) NULL DEFAULT NULL,
     selling_price DECIMAL(10,2) NULL DEFAULT NULL,
-    is_listed TINYINT(1) NOT NULL DEFAULT 1,
     UNIQUE KEY barcode (barcode),
     FOREIGN KEY (category_id) REFERENCES food_categories(id) ON DELETE CASCADE,
     FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL,
@@ -116,67 +115,23 @@ CREATE TABLE IF NOT EXISTS stock_receipts (
     INDEX idx_received (received_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Stock sent back to suppliers; amount is the credit the supplier gave back.
 CREATE TABLE IF NOT EXISTS item_returns (
     id INT AUTO_INCREMENT PRIMARY KEY,
     food_item_id INT NOT NULL,
-    return_type ENUM('customer', 'supplier') NOT NULL,
-    outcome ENUM('restocked', 'disposed', 'sent_back') NOT NULL,
     quantity INT NOT NULL,
     unit_value DECIMAL(10,2) NOT NULL DEFAULT 0,
     amount DECIMAL(10,2) NOT NULL DEFAULT 0,
     reason VARCHAR(255) NULL,
     return_date DATE NOT NULL,
     user_id INT NOT NULL,
-    waste_log_id INT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (food_item_id) REFERENCES food_items(id) ON DELETE RESTRICT,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
-    FOREIGN KEY (waste_log_id) REFERENCES waste_logs(id) ON DELETE SET NULL,
     INDEX idx_return_date (return_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Online pickup reservations from the storefront. Stock is deducted when picked up.
-CREATE TABLE IF NOT EXISTS customer_orders (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    code VARCHAR(20) NOT NULL UNIQUE,
-    customer_name VARCHAR(100) NOT NULL,
-    phone VARCHAR(20) NOT NULL,
-    email VARCHAR(255) NULL,
-    pickup_date DATE NOT NULL,
-    pickup_time CHAR(5) NOT NULL,
-    notes VARCHAR(500) NULL,
-    payment_method VARCHAR(20) NOT NULL DEFAULT 'cash',
-    status ENUM('pending', 'ready', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
-    cancel_reason VARCHAR(255) NULL,
-    total DECIMAL(10,2) NOT NULL DEFAULT 0,
-    savings DECIMAL(10,2) NOT NULL DEFAULT 0,
-    ip_address VARCHAR(45) NULL,
-    handled_by INT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    completed_at DATETIME NULL,
-    FOREIGN KEY (handled_by) REFERENCES users(id) ON DELETE SET NULL,
-    INDEX idx_order_status (status),
-    INDEX idx_order_phone (phone),
-    INDEX idx_order_created (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
-CREATE TABLE IF NOT EXISTS customer_order_items (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    order_id INT NOT NULL,
-    food_item_id INT NOT NULL,
-    item_name VARCHAR(255) NOT NULL,
-    unit VARCHAR(50) NULL,
-    quantity INT NOT NULL,
-    regular_price DECIMAL(10,2) NOT NULL,
-    discount_percent INT NOT NULL DEFAULT 0,
-    unit_price DECIMAL(10,2) NOT NULL,
-    line_total DECIMAL(10,2) NOT NULL,
-    FOREIGN KEY (order_id) REFERENCES customer_orders(id) ON DELETE CASCADE,
-    FOREIGN KEY (food_item_id) REFERENCES food_items(id) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- Store settings (Store Settings page) and the schema version.
+-- Application settings (currently just the schema version).
 CREATE TABLE IF NOT EXISTS app_settings (
     setting_key VARCHAR(50) PRIMARY KEY,
     setting_value TEXT NULL,
@@ -228,8 +183,7 @@ INSERT INTO waste_reasons (reason, description) VALUES
 ('Recall', 'Product subject to safety recall'),
 ('Spillage', 'Product lost due to spill or accident'),
 ('Quality Control', 'Product failed quality inspection'),
-('Other', 'Miscellaneous waste reason'),
-('Customer Return', 'Returned by a customer and not fit to resell')
+('Other', 'Miscellaneous waste reason')
 ON DUPLICATE KEY UPDATE description = VALUES(description);
 
 INSERT INTO food_categories (name, description) VALUES

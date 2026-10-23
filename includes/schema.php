@@ -1,18 +1,27 @@
 <?php
 // Database upgrades. database/schema.sql creates a complete, current database; this brings
 // databases made by older versions of the app up to date (archiving, barcodes and product
-// templates, the stock receipts ledger, returns, storefront pricing, online pickup orders,
-// store settings and supplier deliveries).
+// templates, the stock receipts ledger, supplier returns, selling prices and supplier deliveries),
+// and removes what older versions had for the online store and customer returns.
 // The checks run until they all pass, then once per SCHEMA_VERSION. Bump it after adding a step.
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const REQUIRED_TABLES = [
     'users', 'food_categories', 'suppliers', 'food_items', 'waste_reasons', 'waste_logs', 'products',
-    'stock_receipts', 'item_returns', 'customer_orders', 'customer_order_items', 'app_settings',
-    'supplier_deliveries', 'supplier_delivery_events',
+    'stock_receipts', 'item_returns', 'app_settings', 'supplier_deliveries', 'supplier_delivery_events',
 ];
-const REQUIRED_ITEM_COLUMNS = ['barcode', 'archived_at', 'archive_reason', 'selling_price', 'is_listed'];
+const REQUIRED_ITEM_COLUMNS = ['barcode', 'archived_at', 'archive_reason', 'selling_price'];
+
+// Left behind by the online store and customer returns, which have been removed.
+const OBSOLETE_TABLES = ['customer_order_items', 'customer_orders'];
+const OBSOLETE_ITEM_COLUMNS = ['is_listed'];
+const OBSOLETE_RETURN_COLUMNS = ['return_type', 'outcome', 'waste_log_id'];
+const OBSOLETE_SETTINGS = [
+    'store_name', 'tagline', 'address', 'phone', 'email', 'facebook_url', 'open_time', 'close_time',
+    'default_markup', 'pickup_enabled', 'pickup_days', 'prep_minutes', 'announcement', 'weekly_hours',
+    'store_status', 'status_date', 'payment_online_details', 'payment_bank_details',
+];
 
 function ensure_schema(mysqli $conn): void {
     $result = $conn->query("SELECT setting_value FROM app_settings WHERE setting_key = 'schema_version'");
@@ -29,11 +38,15 @@ function ensure_schema(mysqli $conn): void {
 
     ensureUserRoleEnum($conn);
     ensureAppSchema($conn, $tables, $columns);
+    removeStoreAndCustomerReturns($conn);
 
-    // Only record the version once everything is really there, so a failed step is retried.
+    // Only record the version once everything is really there (and the leftovers are gone),
+    // so a failed step is retried.
     [$tables, $columns] = schema_inventory($conn);
     $missing = array_diff(REQUIRED_TABLES, array_keys($tables)) || array_diff(REQUIRED_ITEM_COLUMNS, array_keys($columns));
-    if (!$missing) {
+    $leftover = array_intersect(OBSOLETE_TABLES, array_keys($tables)) || array_intersect(OBSOLETE_ITEM_COLUMNS, array_keys($columns))
+        || array_intersect(OBSOLETE_RETURN_COLUMNS, table_columns($conn, 'item_returns'));
+    if (!$missing && !$leftover) {
         $conn->query("INSERT INTO app_settings (setting_key, setting_value) VALUES ('schema_version', '" . SCHEMA_VERSION . "')
                       ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)");
     }
@@ -46,12 +59,17 @@ function schema_inventory(mysqli $conn): array {
     while ($result && ($row = $result->fetch_row())) {
         $tables[strtolower($row[0])] = true;
     }
-    $columns = [];
-    $result = isset($tables['food_items']) ? $conn->query('SHOW COLUMNS FROM food_items') : false;
-    while ($result && ($row = $result->fetch_row())) {
-        $columns[strtolower($row[0])] = true;
-    }
+    $columns = isset($tables['food_items']) ? array_fill_keys(table_columns($conn, 'food_items'), true) : [];
     return [$tables, $columns];
+}
+
+// Lower-cased column names of a table, or [] when it doesn't exist.
+function table_columns(mysqli $conn, string $table): array {
+    $stmt = $conn->prepare('SELECT LOWER(column_name) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ?');
+    if (!$stmt || !$stmt->bind_param('s', $table) || !$stmt->execute()) {
+        return [];
+    }
+    return array_column($stmt->get_result()->fetch_all(), 0);
 }
 
 function render_setup_required(): never {
@@ -120,51 +138,8 @@ function ensureAppSchema(mysqli $conn, array $tables, array $columns): void {
     }
 
     if (!isset($columns['selling_price'])) {
-        // NULL selling price = use the store's default markup on the purchase price.
-        $conn->query("ALTER TABLE food_items
-                        ADD COLUMN selling_price DECIMAL(10,2) NULL DEFAULT NULL,
-                        ADD COLUMN is_listed TINYINT(1) NOT NULL DEFAULT 1");
-    }
-
-    if (!isset($tables['customer_orders'])) {
-        $conn->query("CREATE TABLE IF NOT EXISTS customer_orders (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            code VARCHAR(20) NOT NULL UNIQUE,
-            customer_name VARCHAR(100) NOT NULL,
-            phone VARCHAR(20) NOT NULL,
-            email VARCHAR(255) NULL,
-            pickup_date DATE NOT NULL,
-            pickup_time CHAR(5) NOT NULL,
-            notes VARCHAR(500) NULL,
-            status ENUM('pending', 'ready', 'completed', 'cancelled') NOT NULL DEFAULT 'pending',
-            cancel_reason VARCHAR(255) NULL,
-            total DECIMAL(10,2) NOT NULL DEFAULT 0,
-            savings DECIMAL(10,2) NOT NULL DEFAULT 0,
-            ip_address VARCHAR(45) NULL,
-            handled_by INT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            completed_at DATETIME NULL,
-            FOREIGN KEY (handled_by) REFERENCES users(id) ON DELETE SET NULL,
-            INDEX idx_order_status (status),
-            INDEX idx_order_phone (phone),
-            INDEX idx_order_created (created_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-        $conn->query("CREATE TABLE IF NOT EXISTS customer_order_items (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            order_id INT NOT NULL,
-            food_item_id INT NOT NULL,
-            item_name VARCHAR(255) NOT NULL,
-            unit VARCHAR(50) NULL,
-            quantity INT NOT NULL,
-            regular_price DECIMAL(10,2) NOT NULL,
-            discount_percent INT NOT NULL DEFAULT 0,
-            unit_price DECIMAL(10,2) NOT NULL,
-            line_total DECIMAL(10,2) NOT NULL,
-            FOREIGN KEY (order_id) REFERENCES customer_orders(id) ON DELETE CASCADE,
-            FOREIGN KEY (food_item_id) REFERENCES food_items(id) ON DELETE RESTRICT
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // NULL selling price = the default markup on the purchase price.
+        $conn->query("ALTER TABLE food_items ADD COLUMN selling_price DECIMAL(10,2) NULL DEFAULT NULL");
     }
 
     if (!isset($tables['app_settings'])) {
@@ -173,12 +148,6 @@ function ensureAppSchema(mysqli $conn, array $tables, array $columns): void {
             setting_value TEXT NULL,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    }
-
-    // How the customer will pay for an online reservation (chosen in the basket).
-    $result = $conn->query("SHOW COLUMNS FROM customer_orders LIKE 'payment_method'");
-    if ($result && $result->num_rows === 0) {
-        $conn->query("ALTER TABLE customer_orders ADD COLUMN payment_method VARCHAR(20) NOT NULL DEFAULT 'cash' AFTER notes");
     }
 
     // Supplier transactions: scheduled deliveries, tracked from "on the way" to "delivered".
@@ -234,27 +203,21 @@ function ensureLedgerTables(mysqli $conn): void {
         INDEX idx_received (received_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
+    // Stock sent back to suppliers; amount is the credit the supplier gave back.
     $conn->query("CREATE TABLE IF NOT EXISTS item_returns (
         id INT AUTO_INCREMENT PRIMARY KEY,
         food_item_id INT NOT NULL,
-        return_type ENUM('customer', 'supplier') NOT NULL,
-        outcome ENUM('restocked', 'disposed', 'sent_back') NOT NULL,
         quantity INT NOT NULL,
         unit_value DECIMAL(10,2) NOT NULL DEFAULT 0,
         amount DECIMAL(10,2) NOT NULL DEFAULT 0,
         reason VARCHAR(255) NULL,
         return_date DATE NOT NULL,
         user_id INT NOT NULL,
-        waste_log_id INT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (food_item_id) REFERENCES food_items(id) ON DELETE RESTRICT,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
-        FOREIGN KEY (waste_log_id) REFERENCES waste_logs(id) ON DELETE SET NULL,
         INDEX idx_return_date (return_date)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-
-    $conn->query("INSERT IGNORE INTO waste_reasons (reason, description)
-                  VALUES ('Customer Return', 'Returned by a customer and not fit to resell')");
 
     // Give existing items an opening receipt (current stock + everything wasted) so cost reports have a baseline.
     $conn->query("INSERT INTO stock_receipts (food_item_id, quantity, unit_cost, source, received_at)
@@ -265,4 +228,42 @@ function ensureLedgerTables(mysqli $conn): void {
                              FROM waste_logs GROUP BY food_item_id) w ON w.food_item_id = fi.id
                   WHERE fi.quantity + COALESCE(w.units, 0) > 0
                     AND NOT EXISTS (SELECT 1 FROM stock_receipts sr WHERE sr.food_item_id = fi.id)");
+}
+
+// The online store and customer returns were removed: drop their tables, columns and settings.
+// Customer returns are deleted, but anything they were logged as in waste_logs stays.
+function removeStoreAndCustomerReturns(mysqli $conn): void {
+    // Order lines come first in the list because they reference the orders.
+    foreach (OBSOLETE_TABLES as $table) {
+        $conn->query("DROP TABLE IF EXISTS `$table`");
+    }
+
+    if (in_array('is_listed', table_columns($conn, 'food_items'), true)) {
+        $conn->query('ALTER TABLE food_items DROP COLUMN is_listed');
+    }
+
+    $conn->query("DELETE FROM app_settings WHERE setting_key IN ('" . implode("', '", OBSOLETE_SETTINGS) . "')");
+
+    $returnColumns = table_columns($conn, 'item_returns');
+    if (in_array('return_type', $returnColumns, true)) {
+        $conn->query("DELETE FROM item_returns WHERE return_type <> 'supplier'");
+    }
+    if (in_array('waste_log_id', $returnColumns, true)) {
+        // A foreign key has to be dropped before its column, and its name depends on how the table was made.
+        $keys = $conn->query("SELECT constraint_name FROM information_schema.key_column_usage
+                              WHERE table_schema = DATABASE() AND table_name = 'item_returns'
+                                AND column_name = 'waste_log_id' AND referenced_table_name IS NOT NULL");
+        while ($keys && ($row = $keys->fetch_row())) {
+            $conn->query('ALTER TABLE item_returns DROP FOREIGN KEY `' . $row[0] . '`');
+        }
+    }
+    $drop = array_intersect(OBSOLETE_RETURN_COLUMNS, $returnColumns);
+    if ($drop) {
+        $conn->query('ALTER TABLE item_returns ' . implode(', ', array_map(fn ($c) => "DROP COLUMN `$c`", $drop)));
+    }
+
+    // This reason was only used for disposed customer returns; it stays if any waste was logged with it.
+    $conn->query("DELETE wr FROM waste_reasons wr
+                  LEFT JOIN waste_logs wl ON wl.waste_reason_id = wr.id
+                  WHERE wr.reason = 'Customer Return' AND wl.id IS NULL");
 }

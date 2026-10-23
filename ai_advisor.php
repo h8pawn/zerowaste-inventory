@@ -4,10 +4,10 @@ require_once __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/includes/advisor_chat.php';
 
 $user = require_login();
-if (!is_admin($user) && is_ajax()) {
-    json_response(['success' => false, 'message' => 'Only admins can use the AI Waste Advisor.'], 403);
+if (!can_manage($user) && is_ajax()) {
+    json_response(['success' => false, 'message' => 'Only admins and managers can use the AI Waste Advisor.'], 403);
 }
-require_role($user, ['admin']);
+require_role($user, ['admin', 'manager']);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_ajax()) {
     if (($_POST['action'] ?? '') !== 'ask') {
@@ -32,7 +32,7 @@ function advisor_text(string $text): string {
 render_shell_start($user, 'AI Waste Advisor', 'advisor');
 page_header(
     'AI Waste Advisor',
-    'What to do next to reduce waste, worked out from this store\'s own records · last ' . ADVISOR_WINDOW_DAYS . ' days · admins only',
+    'What to do next to reduce waste, worked out from this store\'s own records · last ' . ADVISOR_WINDOW_DAYS . ' days · admins and managers',
     '<a class="btn" href="ai_advisor.php"><i class="fa-solid fa-rotate"></i> Re-analyse</a>'
 );
 ?>
@@ -42,7 +42,7 @@ page_header(
     <span>
         Built-in AI: it learns only from ZeroWaste data, here <?= advisor_plural(count($a['products']), 'product') ?>,
         <?= number_format($wasteEntries) . ($wasteEntries === 1 ? ' waste entry' : ' waste entries') ?>,
-        <?= advisor_plural((int) $t['receipts90'], 'stock receipt') ?> and <?= advisor_plural($a['orders90'], 'completed order') ?> from the last <?= ADVISOR_WINDOW_DAYS ?> days.
+        and <?= advisor_plural((int) $t['receipts90'], 'stock receipt') ?> from the last <?= ADVISOR_WINDOW_DAYS ?> days.
         Nothing is sent outside the system.
     </span>
 </div>
@@ -201,7 +201,7 @@ page_header(
                 <tbody>
                 <?php foreach ($a['forecast'] as $r): [$freshLabel, $freshTone] = freshness_status($r['days_left']); ?>
                     <tr>
-                        <td><div class="cell-title"><?= e($r['name']) ?></div><?php if ($r['reserved']): ?><div class="cell-sub"><?= (int) $r['reserved'] ?> reserved for pickup</div><?php endif; ?></td>
+                        <td class="cell-title"><?= e($r['name']) ?></td>
                         <td class="center qty-big"><?= (int) $r['quantity'] ?></td>
                         <td class="nowrap"><?= e(advisor_pace($r['pace'], $r['unit'])) ?><div class="cell-sub"><?= $r['confidence'] === 'none' ? 'new item' : e($r['confidence']) . ' confidence' ?></div></td>
                         <td class="nowrap"><span class="chip chip-<?= e($freshTone) ?>"><?= e($freshLabel) ?></span><div class="cell-sub"><?= date('M j', strtotime($r['expires'])) ?></div></td>
@@ -256,11 +256,11 @@ page_header(
     <summary class="card-body"><i class="fa-solid fa-circle-info"></i> How the advisor works</summary>
     <div class="card-body" style="padding-top:0">
         <ul>
-            <li><strong>Only your data.</strong> It reads stock received, waste logs, returns, online orders, suppliers and storage locations from this system. It calls no outside service.</li>
+            <li><strong>Only your data.</strong> It reads stock received, waste logs, supplier returns, suppliers and storage locations from this system. It calls no outside service.</li>
             <li><strong>Sales pace.</strong> Units that left stock without being wasted or sent back (received − wasted − sent back − in stock now), divided by the days since the item was first stocked. In-store sales are counted too, because they lower the stock.</li>
-            <li><strong>Expiry forecast.</strong> Batches sell oldest-expiry first at that pace. Whatever can't sell by the end of its best-before date is predicted waste. Units reserved for pickup count as sold.</li>
+            <li><strong>Expiry forecast.</strong> Batches sell oldest-expiry first at that pace. Whatever can't sell by the end of its best-before date is predicted waste.</li>
             <li><strong>Smart order sizes.</strong> Pace × shelf life, capped at 30 days, minus the stock that will still sell. Shelf life is how long this store's own batches lasted from delivery to best-before, or the built-in shelf-life profiles for new items.</li>
-            <li><strong>Recommendations.</strong> Waste reasons, suppliers, storage, the storefront and the 30-day trend are checked against fixed rules, then ranked by urgency and money at stake.</li>
+            <li><strong>Recommendations.</strong> Waste reasons, suppliers, storage and the 30-day trend are checked against fixed rules, then ranked by urgency and money at stake.</li>
             <li><strong>Zero-Waste Score.</strong> Waste as a share of stock cost (50 points), stock forecast to expire unsold (25), the 30-day trend (15), and how much expired stock staff caught before the system had to clear it (10).</li>
             <li><strong>Confidence.</strong> Low with under a week of history or very few sales; it improves as more stock is received, sold and logged.</li>
         </ul>

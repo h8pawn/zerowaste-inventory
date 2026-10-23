@@ -2,7 +2,6 @@
 require_once __DIR__ . '/includes/app.php';
 require_once __DIR__ . '/includes/layout.php';
 require_once __DIR__ . '/includes/shelf_life.php';
-require_once __DIR__ . '/includes/store.php';
 require_once __DIR__ . '/includes/barcode.php';
 
 $user = require_login();
@@ -25,7 +24,6 @@ function read_item_form(?int $ignoreId = null): array {
         'storage_location' => trim((string) ($_POST['storage_location'] ?? '')),
         'supplier_id' => ($_POST['supplier_id'] ?? '') !== '' ? (int) $_POST['supplier_id'] : null,
         'selling_price' => ($_POST['selling_price'] ?? '') !== '' ? round((float) $_POST['selling_price'], 2) : null,
-        'is_listed' => isset($_POST['is_listed']) ? 1 : 0,
     ];
     $data['barcode'] = $data['barcode'] !== '' ? $data['barcode'] : null;
 
@@ -161,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && is_ajax()) {
 
     if ($action === 'item_details') {
         $item = db_one(
-            'SELECT id, name, barcode, category_id, quantity, unit, purchase_price, selling_price, is_listed, expiration_date, storage_location, supplier_id
+            'SELECT id, name, barcode, category_id, quantity, unit, purchase_price, selling_price, expiration_date, storage_location, supplier_id
              FROM food_items WHERE id = ?',
             'i',
             [(int) ($_POST['item_id'] ?? 0)]
@@ -237,10 +235,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $generated = true;
             }
             db_exec(
-                'INSERT INTO food_items (name, barcode, category_id, quantity, unit, purchase_price, selling_price, is_listed, expiration_date, storage_location, supplier_id)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                'ssiisddissi',
-                [$d['name'], $d['barcode'], $d['category_id'], $d['quantity'], $d['unit'], $d['purchase_price'], $d['selling_price'], $d['is_listed'], $d['expiration_date'], $d['storage_location'], $d['supplier_id']]
+                'INSERT INTO food_items (name, barcode, category_id, quantity, unit, purchase_price, selling_price, expiration_date, storage_location, supplier_id)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                'ssiisddssi',
+                [$d['name'], $d['barcode'], $d['category_id'], $d['quantity'], $d['unit'], $d['purchase_price'], $d['selling_price'], $d['expiration_date'], $d['storage_location'], $d['supplier_id']]
             );
             $newItemId = db_last_id();
             record_receipt($newItemId, $d['quantity'], $d['purchase_price'], 'initial', $user['id']);
@@ -285,10 +283,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             db_exec(
                 'UPDATE food_items SET name = ?, barcode = ?, category_id = ?, quantity = ?, unit = ?, purchase_price = ?,
-                        selling_price = ?, is_listed = ?, expiration_date = ?, storage_location = ?, supplier_id = ?
+                        selling_price = ?, expiration_date = ?, storage_location = ?, supplier_id = ?
                  WHERE id = ?',
-                'ssiisddissii',
-                [$d['name'], $d['barcode'], $d['category_id'], $d['quantity'], $d['unit'], $d['purchase_price'], $d['selling_price'], $d['is_listed'], $d['expiration_date'], $d['storage_location'], $d['supplier_id'], $itemId]
+                'ssiisddssii',
+                [$d['name'], $d['barcode'], $d['category_id'], $d['quantity'], $d['unit'], $d['purchase_price'], $d['selling_price'], $d['expiration_date'], $d['storage_location'], $d['supplier_id'], $itemId]
             );
             // Stock added by hand still cost money, so upward corrections count as received stock.
             record_receipt($itemId, $d['quantity'] - (int) $previousQty, $d['purchase_price'], 'adjust', $user['id']);
@@ -454,11 +452,10 @@ if ($filters['q'] !== '') {
 $fromSql = "FROM food_items fi
             JOIN food_categories fc ON fc.id = fi.category_id
             LEFT JOIN suppliers s ON s.id = fi.supplier_id
-            " . RESERVED_JOIN . "
             WHERE " . implode(' AND ', $where);
 $orderSql = 'ORDER BY ' . $sortColumns[$filters['sort']] . ' ' . strtoupper($filters['dir']) . ', fi.id DESC';
 $selectSql = "SELECT fi.*, fc.name AS category_name, s.name AS supplier_name,
-                     DATEDIFF(fi.expiration_date, CURDATE()) AS days_left, COALESCE(rsv.reserved, 0) AS reserved
+                     DATEDIFF(fi.expiration_date, CURDATE()) AS days_left
               $fromSql $orderSql";
 
 if (($_GET['export'] ?? '') === 'csv') {
@@ -467,16 +464,16 @@ if (($_GET['export'] ?? '') === 'csv') {
     header('Content-Disposition: attachment; filename="inventory-' . date('Y-m-d') . '.csv"');
     $out = fopen('php://output', 'w');
     fwrite($out, "\xEF\xBB\xBF");
-    fputcsv($out, ['Barcode', 'Item', 'Category', 'Quantity', 'Reserved Online', 'Unit', 'Unit Cost', 'Selling Price', 'Stock Value', 'Expiration Date', 'Days Left', 'Freshness', 'Stock Status', 'On Storefront', 'Storage', 'Supplier']);
+    fputcsv($out, ['Barcode', 'Item', 'Category', 'Quantity', 'Unit', 'Unit Cost', 'Selling Price', 'Stock Value', 'Expiration Date', 'Days Left', 'Freshness', 'Stock Status', 'Storage', 'Supplier']);
     foreach ($rows as $r) {
         $days = (int) $r['days_left'];
         $retail = retail_price($r['selling_price'], $r['purchase_price']);
         fputcsv($out, [
-            $r['barcode'], $r['name'], $r['category_name'], $r['quantity'], $r['reserved'], $r['unit'],
+            $r['barcode'], $r['name'], $r['category_name'], $r['quantity'], $r['unit'],
             $r['purchase_price'], $retail !== null ? number_format($retail, 2, '.', '') : '',
             number_format((int) $r['quantity'] * (float) $r['purchase_price'], 2, '.', ''),
             $r['expiration_date'], $days, freshness_status($days)[0], stock_status((int) $r['quantity'])[0],
-            (int) $r['is_listed'] && $retail !== null ? 'Yes' : 'No', $r['storage_location'], $r['supplier_name'],
+            $r['storage_location'], $r['supplier_name'],
         ]);
     }
     fclose($out);
@@ -590,7 +587,7 @@ page_header(
     <?php if ($canManage): ?>
         <button type="submit" form="bulkForm" name="action" value="generate_barcodes" class="btn btn-sm"><i class="fa-solid fa-barcode"></i> Generate missing barcodes</button>
         <button type="submit" form="bulkForm" name="action" value="bulk_delete" class="btn btn-sm btn-danger"
-                data-confirm="Delete the selected items? Items with waste, return or order history are moved to the archive instead."><i class="fa-solid fa-trash"></i> Delete selected</button>
+                data-confirm="Delete the selected items? Items with waste or return history are moved to the archive instead."><i class="fa-solid fa-trash"></i> Delete selected</button>
     <?php endif; ?>
 </div>
 
@@ -631,7 +628,6 @@ page_header(
                     [$freshLabel, $freshTone] = freshness_status($days);
                     $discount = $qty > 0 ? discount_percent($days) : 0;
                     $retail = retail_price($item['selling_price'], $item['purchase_price']);
-                    $reservedQty = (int) $item['reserved'];
                     ?>
                     <tr data-item-id="<?= $id ?>">
                         <td class="col-check"><input type="checkbox" name="ids[]" value="<?= $id ?>" form="bulkForm" class="row-check" aria-label="Select <?= e($item['name']) ?>"></td>
@@ -646,7 +642,6 @@ page_header(
                             <div class="cell-title"><?= e($item['name']) ?></div>
                             <div class="cell-sub">
                                 <?= e($item['supplier_name'] ?? 'No supplier') ?><?= $item['storage_location'] ? ' · ' . e($item['storage_location']) : '' ?>
-                                <?php if (!(int) $item['is_listed']): ?> · <span title="Not shown on the storefront"><i class="fa-solid fa-eye-slash"></i> Hidden online</span><?php endif; ?>
                             </div>
                         </td>
                         <td><span class="chip chip-green"><?= e($item['category_name']) ?></span></td>
@@ -656,9 +651,6 @@ page_header(
                                 <div class="cell-sub num" title="Cost / selling price<?= $item['selling_price'] === null && $retail !== null ? ' (default markup)' : '' ?>">
                                     <?= $item['purchase_price'] !== null ? peso($item['purchase_price']) : '—' ?> → <?= $retail !== null ? peso($retail) : '—' ?>
                                 </div>
-                            <?php endif; ?>
-                            <?php if ($reservedQty > 0): ?>
-                                <div class="cell-sub" style="color:var(--blue-fg);font-weight:700"><a href="orders.php" style="color:inherit"><i class="fa-solid fa-basket-shopping"></i> <?= $reservedQty ?> reserved</a></div>
                             <?php endif; ?>
                         </td>
                         <td class="nowrap"><?= date('M j, Y', strtotime($item['expiration_date'])) ?></td>
@@ -678,8 +670,8 @@ page_header(
                                         <button type="button" class="menu-item" data-receive="<?= $id ?>" data-name="<?= e($item['name']) ?>" data-unit="<?= e($item['unit']) ?>"><i class="fa-solid fa-dolly"></i> Receive stock</button>
                                         <?php if ($qty > 0): ?>
                                             <a class="menu-item" href="log_waste.php?item=<?= $id ?>"><i class="fa-solid fa-trash-can"></i> Log waste</a>
+                                            <a class="menu-item" href="returns.php?item=<?= $id ?>"><i class="fa-solid fa-rotate-left"></i> Return to supplier</a>
                                         <?php endif; ?>
-                                        <a class="menu-item" href="returns.php?item=<?= $id ?>"><i class="fa-solid fa-rotate-left"></i> Record return</a>
                                     <?php endif; ?>
                                     <?php if ($item['barcode']): ?>
                                         <a class="menu-item" href="barcode_labels.php?ids=<?= $id ?>" target="_blank" rel="noopener"><i class="fa-solid fa-print"></i> Print barcode label</a>
@@ -782,7 +774,7 @@ function item_form_fields(string $prefix, array $categories, array $suppliers, b
         <div class="field">
             <label for="<?= $prefix ?>Sell">Selling price (₱ per unit)</label>
             <input class="input" type="number" step="0.01" min="0" name="selling_price" id="<?= $prefix ?>Sell" placeholder="Auto" data-sell-for="<?= $prefix ?>SellHint">
-            <span class="hint" id="<?= $prefix ?>SellHint" data-markup="<?= e(store_settings()['default_markup']) ?>">Blank = cost + <?= e(store_settings()['default_markup']) ?>% markup</span>
+            <span class="hint" id="<?= $prefix ?>SellHint" data-markup="<?= DEFAULT_MARKUP_PERCENT ?>">Blank = cost + <?= DEFAULT_MARKUP_PERCENT ?>% markup</span>
         </div>
         <div class="field">
             <label for="<?= $prefix ?>Expiry">Expiration date <span class="req">*</span></label>
@@ -806,10 +798,6 @@ function item_form_fields(string $prefix, array $categories, array $suppliers, b
                     <option value="<?= (int) $sup['id'] ?>"><?= e($sup['name']) ?></option>
                 <?php endforeach; ?>
             </select>
-        </div>
-        <div class="field span-2">
-            <label class="check"><input type="checkbox" name="is_listed" value="1" id="<?= $prefix ?>Listed" checked> Show on the online store</label>
-            <span class="hint">Customers can see and reserve this item on the storefront while it's in stock.</span>
         </div>
     </div>
     <?php
@@ -964,7 +952,6 @@ function item_form_fields(string $prefix, array $categories, array $suppliers, b
             setSelectKeep($('editStorage'), it.storage_location);
             setSelect($('editSupplier'), it.supplier_id);
             $('editSell').value = it.selling_price ?? '';
-            $('editListed').checked = String(it.is_listed) === '1';
             updateSellHint($('editSellHint'));
             openModal('editItemModal');
         }).catch(() => alert('Error loading item details.'));
