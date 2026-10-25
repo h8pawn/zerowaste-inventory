@@ -765,6 +765,7 @@ function item_form_fields(string $prefix, array $categories, array $suppliers, b
                 <option value="tray">Tray</option>
                 <option value="bundle">Bundle</option>
                 <option value="box">Box</option>
+                <option value="kg">Kilo (kg)</option>
             </select>
         </div>
         <div class="field">
