@@ -762,6 +762,7 @@ function item_form_fields(string $prefix, array $categories, array $suppliers, b
             <label for="<?= $prefix ?>Unit">Unit <span class="req">*</span></label>
             <select class="select" name="unit" id="<?= $prefix ?>Unit" required>
                 <option value="">Select unit</option>
+                <option value="unit">Unit</option>
                 <option value="tray">Tray</option>
                 <option value="bundle">Bundle</option>
                 <option value="box">Box</option>
