@@ -5,44 +5,9 @@ require_once __DIR__ . '/includes/layout.php';
 $user = require_login();
 
 $today = new DateTimeImmutable('today');
-$periods = [
-    'this_month' => 'This month',
-    'last_month' => 'Last month',
-    '30d' => 'Last 30 days',
-    '90d' => 'Last 90 days',
-    'year' => 'This year',
-];
+$periods = REPORT_PERIODS;
 $period = array_key_exists($_GET['period'] ?? '', $periods) ? $_GET['period'] : 'this_month';
-
-// Each period is compared with the equivalent stretch just before it.
-switch ($period) {
-    case 'last_month':
-        $start = $today->modify('first day of last month');
-        $end = $today->modify('last day of last month');
-        $prevStart = $start->modify('first day of last month');
-        $prevEnd = $start->modify('-1 day');
-        break;
-    case '30d':
-    case '90d':
-        $days = $period === '30d' ? 30 : 90;
-        $start = $today->modify('-' . ($days - 1) . ' days');
-        $end = $today;
-        $prevStart = $start->modify("-$days days");
-        $prevEnd = $start->modify('-1 day');
-        break;
-    case 'year':
-        $start = $today->modify('first day of january this year');
-        $end = $today;
-        $prevStart = $start->modify('-1 year');
-        $prevEnd = $today->modify('-1 year');
-        break;
-    default:
-        $start = $today->modify('first day of this month');
-        $end = $today;
-        $prevStart = $start->modify('first day of last month');
-        // Same number of days into last month, capped at its last day.
-        $prevEnd = min($prevStart->modify('+' . ((int) $today->format('j') - 1) . ' days'), $prevStart->modify('last day of this month'));
-}
+[$start, $end, $prevStart, $prevEnd] = report_period($period, $today);
 
 $range = [$start->format('Y-m-d'), $end->format('Y-m-d')];
 $prevRange = [$prevStart->format('Y-m-d'), $prevEnd->format('Y-m-d')];

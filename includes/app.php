@@ -70,6 +70,42 @@ function valid_date(string $value): bool {
     return $d !== false && $d->format('Y-m-d') === $value;
 }
 
+/* ---------- Reporting periods (Reports page and the AI Waste Advisor) ---------- */
+
+const REPORT_PERIODS = [
+    'this_month' => 'This month',
+    'last_month' => 'Last month',
+    '30d' => 'Last 30 days',
+    '90d' => 'Last 90 days',
+    'year' => 'This year',
+];
+
+// [start, end, previous start, previous end] as dates. Each period is compared with the
+// equivalent stretch just before it.
+function report_period(string $period, ?DateTimeImmutable $today = null): array {
+    $today ??= new DateTimeImmutable('today');
+    switch ($period) {
+        case 'last_month':
+            $start = $today->modify('first day of last month');
+            $end = $today->modify('last day of last month');
+            return [$start, $end, $start->modify('first day of last month'), $start->modify('-1 day')];
+        case '30d':
+        case '90d':
+            $days = $period === '30d' ? 30 : 90;
+            $start = $today->modify('-' . ($days - 1) . ' days');
+            return [$start, $today, $start->modify("-$days days"), $start->modify('-1 day')];
+        case 'year':
+            $start = $today->modify('first day of january this year');
+            return [$start, $today, $start->modify('-1 year'), $today->modify('-1 year')];
+        default:
+            $start = $today->modify('first day of this month');
+            $prevStart = $start->modify('first day of last month');
+            // Same number of days into last month, capped at its last day.
+            $prevEnd = min($prevStart->modify('+' . ((int) $today->format('j') - 1) . ' days'), $prevStart->modify('last day of this month'));
+            return [$start, $today, $prevStart, $prevEnd];
+    }
+}
+
 function json_response(array $payload, int $status = 200): never {
     http_response_code($status);
     header('Content-Type: application/json');

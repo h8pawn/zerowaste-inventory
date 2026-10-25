@@ -122,6 +122,9 @@ function advisor_keeps(int $shelfDays): string {
 }
 
 function advisor_plural(int $n, string $word): string {
+    if ($n !== 1 && preg_match('/[^aeiou]y$/', $word)) {
+        return $n . ' ' . substr($word, 0, -1) . 'ies';
+    }
     return $n . ' ' . $word . ($n === 1 ? '' : (preg_match('/(ch|sh|s|x)$/', $word) ? 'es' : 's'));
 }
 

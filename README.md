@@ -15,7 +15,7 @@ Built with plain PHP and MySQL. There is no framework, no build step and no Comp
 - **Returns:** stock sent back to suppliers, with the credit recovered.
 - **Suppliers & Deliveries:** supplier records with the products each one delivers (by category; new categories can be added right there and show up in Add Item), supplier details with everything they have delivered and when they last did business with the store, scheduled deliveries tracked Scheduled → On the way → Delivered, paid/unpaid status, and a notification bell.
 - **Users:** sign-up approval, roles, password resets.
-- **AI Waste Advisor (admins and managers):** works out a Zero-Waste Score, ranked recommendations to cut waste (what to mark down or donate, what to order less of, storage and supplier fixes), an expiry forecast of stock that won't sell in time, and safe order sizes, all on the server from the system's own records. Its **Ask the advisor** chat is answered by **Claude** (Anthropic's AI) when an API key is set: ask anything about the store in plain English, Filipino or Taglish ("How many items are in stock?", "Which supplier wastes the most?", "Anong deliveries ang darating bukas?"). Claude looks up the records it needs through read-only lookups, so it can't change data. Without a key the chat uses built-in answers and nothing leaves the server.
+- **AI Waste Advisor (admins and managers):** works out a Zero-Waste Score, ranked recommendations to cut waste (what to mark down or donate, what to order less of, storage and supplier fixes), an expiry forecast of stock that won't sell in time, and safe order sizes, all on the server from the system's own records. Its **Ask the advisor** chat is answered by **Claude** (Anthropic's AI) when an API key is set: ask anything about the store in plain English, Filipino or Taglish ("How many items are in stock?", "Which supplier wastes the most?", "Anong deliveries ang darating bukas?"). Claude looks up the records it needs through read-only lookups covering every part of the system (inventory, the archive, waste and reports, stock received, supplier returns, suppliers and what they deliver, deliveries and their transaction logs, categories, product templates and user accounts), so it can't change data. Without a key the chat uses built-in answers from the same records and nothing leaves the server.
 
 **Store front page (public)**
 - `front_page.php`: one screen with no scrolling on laptops and desktops: the store's photo as the background, its name and taglines, "Less waste, lower prices" and the zero-waste promise. It lists no products and takes no orders. Staff reach the sign-in page from its **Log in** button.
@@ -126,7 +126,8 @@ location ~ /\.|\.(sql|md|log)$|config\.local(\.example)?\.php$ { deny all; }
 │   ├── layout.php          Page chrome, navigation, charts, status and pricing helpers
 │   ├── advisor.php         AI Waste Advisor: sales pace, expiry forecast, order sizes, recommendations, score
 │   ├── advisor_chat.php    "Ask the advisor" built-in answers (used without an API key)
-│   ├── advisor_ai.php      "Ask the advisor" with Claude: read-only store lookups, API calls, reply formatting
+│   ├── advisor_tools.php   Read-only store lookups shared by both: items, waste, reports, suppliers, deliveries, users...
+│   ├── advisor_ai.php      "Ask the advisor" with Claude: tool definitions, API calls, reply formatting
 │   ├── deliveries.php      Delivery statuses and notifications
 │   ├── barcode.php         EAN-13 / Code 128 generation and SVG rendering
 │   └── shelf_life.php      Expiry-date estimation
@@ -141,7 +142,7 @@ location ~ /\.|\.(sql|md|log)$|config\.local(\.example)?\.php$ { deny all; }
 ## Security
 
 - Passwords are hashed with `password_hash()`; all SQL uses prepared statements; all output is HTML-escaped.
-- With `ANTHROPIC_API_KEY` set, advisor chat questions and the store records Claude looks up (items, stock, prices, waste, supplier contacts, deliveries) are sent to Anthropic's API. Staff emails and passwords never are. The key stays on the server in `config.local.php`.
+- With `ANTHROPIC_API_KEY` set, advisor chat questions and the store records Claude looks up (items, stock, prices, waste, reports, supplier contacts, deliveries, returns, the archive, and usernames, roles and what each user recorded) are sent to Anthropic's API. Staff emails and passwords never are. The key stays on the server in `config.local.php`.
 - Every form and AJAX request carries a CSRF token. Session cookies are `HttpOnly`, `SameSite=Lax`, and `Secure` on HTTPS. The session ID changes at sign-in.
 - Roles are re-checked against the database on every request, so a deactivated account is signed out at once.
 - Staff (view-only) accounts are blocked from changing data on the server, not just in the interface.

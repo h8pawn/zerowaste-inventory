@@ -14,7 +14,6 @@ const ADVISOR_AI_MODEL = 'claude-opus-5-5';
 const ADVISOR_AI_MAX_TOOL_ROUNDS = 8;   // lookups per question before it must answer
 const ADVISOR_AI_HISTORY_TURNS = 8;     // earlier questions and answers it remembers
 const ADVISOR_AI_SESSION_KEY = 'advisor_ai_history';
-const ADVISOR_AI_MAX_ROWS = 100;
 const ADVISOR_AI_JSON = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_INVALID_UTF8_SUBSTITUTE;
 
 final class AdvisorAiException extends RuntimeException {
@@ -35,8 +34,9 @@ function advisor_ai_enabled(): bool {
 
 function advisor_ai_system_prompt(): string {
     return 'You are the ZeroWaste AI Advisor for ' . STORE_NAME . ', a neighborhood grocery store in the Philippines. '
-        . 'You help its admins and managers understand their inventory, expiry dates, waste, stock received, stock returned '
-        . 'to suppliers, suppliers and deliveries, and you give practical advice for reducing food waste.
+        . 'You help its admins and managers with every part of the store\'s ZeroWaste system: inventory and expiry dates, the archive, '
+        . 'waste and reports, stock received, stock returned to suppliers, suppliers and what they deliver, deliveries and their payment, '
+        . 'categories, product templates and user accounts, and you give practical advice for reducing food waste.
 
 How to answer:
 - Get every fact from the tools. Never guess or invent a number, item, supplier or date. If the tools have no data for something, say so.
@@ -54,6 +54,8 @@ Store vocabulary:
 - Suggested markdowns: 20% off 2 days before expiry, 50% off on the last day.
 - Selling price is the item\'s own price, or the purchase price plus a ' . DEFAULT_MARKUP_PERCENT . '% default markup.
 - Returns are stock sent back to suppliers; credit is the money the supplier gave back.
+- Archived items (expired, archived by staff, or removed while they have history) are hidden from inventory but kept for reports; they can be restored.
+- User accounts: you can see usernames, roles, status and what each person recorded, never emails or passwords. Sign-in times are not recorded.
 - The store records no sales, so you cannot report sales or profit. The "sales pace" from get_advisor_insights is an estimate: units that left stock without being wasted or returned.
 
 You can only read data. To change something, tell the user where to do it: Food Items (add, edit, receive stock, print barcode labels), Expiring Soon, Low Stock, Archive, Log Waste, Returns, Waste History, Reports, Suppliers, Deliveries, and User Accounts.
@@ -63,7 +65,7 @@ If a question has nothing to do with this store, its stock, food waste or runnin
 
 function advisor_ai_tools(): array {
     $date = fn (string $what) => ['type' => 'string', 'description' => $what . ' (YYYY-MM-DD).'];
-    $limit = ['type' => 'integer', 'description' => 'Most rows to return, 1 to ' . ADVISOR_AI_MAX_ROWS . '. Default 50.'];
+    $limit = ['type' => 'integer', 'description' => 'Most rows to return, 1 to ' . ADVISOR_TOOL_MAX_ROWS . '. Default 50.'];
     $tools = [
         [
             'name' => 'get_store_overview',
@@ -119,6 +121,7 @@ function advisor_ai_tools(): array {
                     'to' => $date('Last day to include. Default: today'),
                     'group_by' => ['type' => 'string', 'enum' => ['none', 'item', 'supplier', 'category', 'month', 'source'], 'description' => 'none lists the receipts, newest first. Default item.'],
                     'item' => ['type' => 'string', 'description' => 'Only items whose name contains this text.'],
+                    'supplier' => ['type' => 'string', 'description' => 'Only items from suppliers whose name contains this text.'],
                     'limit' => $limit,
                 ],
             ],
@@ -153,15 +156,78 @@ function advisor_ai_tools(): array {
         [
             'name' => 'get_deliveries',
             'description' => 'Supplier deliveries with their reference (DLV-00012), items, amount, expected date and time, status '
-                . '(scheduled, on the way, delivered, cancelled), payment status and notes. Use it for questions about upcoming, '
-                . 'overdue or past deliveries and unpaid deliveries.',
+                . '(scheduled, on the way, delivered, cancelled), payment status and notes, plus how much delivered stock is still unpaid. '
+                . 'With a reference, returns that one delivery with its transaction log (who scheduled, shipped, delivered and paid it, and when). '
+                . 'Use it for questions about upcoming, overdue or past deliveries and unpaid deliveries.',
             'input_schema' => [
                 'type' => 'object',
                 'properties' => [
+                    'reference' => ['type' => 'string', 'description' => 'One delivery, e.g. DLV-00012 or 12. The other filters are ignored.'],
                     'status' => ['type' => 'string', 'enum' => ['any', 'open', 'scheduled', 'on_the_way', 'delivered', 'cancelled', 'unpaid'], 'description' => 'open means scheduled or on the way. Default any.'],
                     'supplier' => ['type' => 'string', 'description' => 'Only suppliers whose name contains this text.'],
                     'from' => $date('Earliest expected date to include'),
                     'to' => $date('Latest expected date to include'),
+                    'limit' => $limit,
+                ],
+            ],
+        ],
+        [
+            'name' => 'get_report',
+            'description' => 'The Reports page for a period: waste totals compared with the period before (with % change), stock cost received and '
+                . 'waste as % of it, the top wasted items, waste by reason, category and supplier, supplier returns, and the last 12 months. '
+                . 'Use it for report, comparison and trend questions ("how did we do last month", "compare with September").',
+            'input_schema' => [
+                'type' => 'object',
+                'properties' => [
+                    'period' => ['type' => 'string', 'enum' => array_keys(REPORT_PERIODS), 'description' => 'this_month, last_month, 30d, 90d or year. Default this_month.'],
+                    'from' => $date('Start of a custom range instead of a period'),
+                    'to' => $date('End of a custom range'),
+                ],
+            ],
+        ],
+        [
+            'name' => 'get_users',
+            'description' => 'User accounts: username, role (admin, manager, staff), active or inactive, date joined, and what each person '
+                . 'recorded (waste entries and their value, supplier returns, stock receipts, deliveries scheduled) with their last activity. '
+                . 'No emails or passwords. Use it for questions about staff, roles, pending accounts and who logged what.',
+            'input_schema' => [
+                'type' => 'object',
+                'properties' => [
+                    'role' => ['type' => 'string', 'enum' => ['any', 'admin', 'manager', 'staff'], 'description' => 'Default any.'],
+                    'status' => ['type' => 'string', 'enum' => ['any', 'active', 'inactive'], 'description' => 'inactive = waiting for approval or deactivated. Default any.'],
+                    'query' => ['type' => 'string', 'description' => 'Only usernames containing this text.'],
+                ],
+            ],
+        ],
+        [
+            'name' => 'get_archive',
+            'description' => 'The Archive: items hidden from inventory because they expired, were archived by staff, or were removed while they '
+                . 'had history, with the date archived, last expiry date, units left and lifetime waste. Use it for questions about '
+                . 'archived, expired or removed items.',
+            'input_schema' => [
+                'type' => 'object',
+                'properties' => [
+                    'reason' => ['type' => 'string', 'enum' => ['any', 'expired', 'manual', 'removed'], 'description' => 'manual = archived by staff. Default any.'],
+                    'query' => ['type' => 'string', 'description' => 'Text to look for in the item name, barcode or category.'],
+                    'limit' => $limit,
+                ],
+            ],
+        ],
+        [
+            'name' => 'get_categories',
+            'description' => 'Every product category with its active items, units and stock value, archived items, product templates, the '
+                . 'suppliers who deliver it and its waste in the last 90 days, plus the list of waste reasons and how often each was used. '
+                . 'Use it for category questions and to see which categories and waste reasons exist.',
+            'input_schema' => ['type' => 'object', 'properties' => new stdClass()],
+        ],
+        [
+            'name' => 'get_product_templates',
+            'description' => 'Product templates (saved from Add Item for Quick Scan): barcode, name, category, unit, default purchase price, '
+                . 'default shelf life, units in stock now and who created it. Use it for barcode and template questions.',
+            'input_schema' => [
+                'type' => 'object',
+                'properties' => [
+                    'query' => ['type' => 'string', 'description' => 'Text to look for in the name, barcode or category.'],
                     'limit' => $limit,
                 ],
             ],
@@ -185,7 +251,7 @@ function advisor_ai_tools(): array {
     return $tools;
 }
 
-/* ---------- The tools: read-only queries on the store's records ---------- */
+/* ---------- Running a tool (the lookups themselves are in advisor_tools.php) ---------- */
 
 function advisor_ai_run_tool(string $name, array $in): array {
     return match ($name) {
@@ -197,586 +263,13 @@ function advisor_ai_run_tool(string $name, array $in): array {
         'get_suppliers' => advisor_tool_suppliers($in),
         'get_deliveries' => advisor_tool_deliveries($in),
         'get_advisor_insights' => advisor_tool_insights($in),
+        'get_report' => advisor_tool_report($in),
+        'get_users' => advisor_tool_users($in),
+        'get_archive' => advisor_tool_archive($in),
+        'get_categories' => advisor_tool_categories(),
+        'get_product_templates' => advisor_tool_product_templates($in),
         default => throw new InvalidArgumentException('There is no tool called ' . $name . '.'),
     };
-}
-
-function advisor_tool_text(array $in, string $key): string {
-    return mb_substr(trim((string) ($in[$key] ?? '')), 0, 100);
-}
-
-function advisor_tool_choice(array $in, string $key, array $allowed, string $default): string {
-    $value = (string) ($in[$key] ?? $default);
-    if (!in_array($value, $allowed, true)) {
-        throw new InvalidArgumentException($key . ' must be one of: ' . implode(', ', $allowed) . '.');
-    }
-    return $value;
-}
-
-function advisor_tool_limit(array $in): int {
-    return max(1, min(ADVISOR_AI_MAX_ROWS, (int) ($in['limit'] ?? 50)));
-}
-
-// [from, to] as Y-m-d, from the input or the defaults.
-function advisor_tool_range(array $in, string $defaultFrom): array {
-    $range = [];
-    foreach (['from' => $defaultFrom, 'to' => date('Y-m-d')] as $key => $default) {
-        $value = trim((string) ($in[$key] ?? ''));
-        if ($value !== '' && !valid_date($value)) {
-            throw new InvalidArgumentException($key . ' must be a date written YYYY-MM-DD.');
-        }
-        $range[] = $value !== '' ? $value : $default;
-    }
-    if ($range[0] > $range[1]) {
-        $range = [$range[1], $range[0]];
-    }
-    return $range;
-}
-
-function advisor_tool_money($value): float {
-    return round((float) $value, 2);
-}
-
-function advisor_tool_waste_totals(string $from, string $to): array {
-    $row = db_one(
-        'SELECT COUNT(*) AS entries, COALESCE(SUM(quantity_wasted), 0) AS units, COALESCE(SUM(estimated_value), 0) AS value
-         FROM waste_logs WHERE waste_date BETWEEN ? AND ?',
-        'ss',
-        [$from, $to]
-    );
-    return ['entries' => (int) $row['entries'], 'units' => (int) $row['units'], 'value' => advisor_tool_money($row['value'])];
-}
-
-function advisor_tool_received_cost(string $from, string $to): float {
-    return advisor_tool_money(db_value(
-        'SELECT COALESCE(SUM(quantity * unit_cost), 0) FROM stock_receipts WHERE received_at >= ? AND received_at < ? + INTERVAL 1 DAY',
-        'ss',
-        [$from, $to]
-    ));
-}
-
-function advisor_tool_overview(): array {
-    $today = date('Y-m-d');
-    $monthStart = date('Y-m-01');
-    $lastMonthStart = date('Y-m-01', strtotime('first day of last month'));
-    $lastMonthEnd = date('Y-m-t', strtotime('first day of last month'));
-
-    $inv = db_one(
-        'SELECT COUNT(*) AS records, COUNT(DISTINCT LOWER(TRIM(fi.name))) AS products,
-                COALESCE(SUM(fi.quantity), 0) AS units,
-                COALESCE(SUM(fi.quantity * COALESCE(fi.purchase_price, 0)), 0) AS value_cost,
-                COALESCE(SUM(fi.quantity * COALESCE(fi.selling_price, fi.purchase_price * (1 + ? / 100), 0)), 0) AS value_retail,
-                COALESCE(SUM(fi.quantity > 0), 0) AS in_stock,
-                COALESCE(SUM(fi.quantity = 0), 0) AS out_of_stock,
-                COALESCE(SUM(fi.quantity > 0 AND fi.quantity <= ?), 0) AS low_stock,
-                COALESCE(SUM(fi.quantity >= ?), 0) AS overstock,
-                COALESCE(SUM(fi.quantity > 0 AND fi.expiration_date BETWEEN CURDATE() AND CURDATE() + INTERVAL ? DAY), 0) AS expiring,
-                COALESCE(SUM(CASE WHEN fi.expiration_date BETWEEN CURDATE() AND CURDATE() + INTERVAL ? DAY THEN fi.quantity END), 0) AS expiring_units,
-                COALESCE(SUM(fi.purchase_price IS NULL), 0) AS without_price
-         FROM food_items fi WHERE ' . ACTIVE_ITEM_SQL,
-        'iiiii',
-        [DEFAULT_MARKUP_PERCENT, LOW_STOCK_THRESHOLD, OVERSTOCK_THRESHOLD, EXPIRING_SOON_DAYS, EXPIRING_SOON_DAYS]
-    );
-    $categories = db_all(
-        'SELECT fc.name AS category, COUNT(fi.id) AS item_records, COALESCE(SUM(fi.quantity), 0) AS units,
-                COALESCE(SUM(fi.quantity * COALESCE(fi.purchase_price, 0)), 0) AS stock_value
-         FROM food_categories fc
-         LEFT JOIN food_items fi ON fi.category_id = fc.id AND ' . ACTIVE_ITEM_SQL . '
-         GROUP BY fc.id, fc.name
-         ORDER BY fc.name'
-    );
-    $returns = db_one(
-        'SELECT COUNT(*) AS returns_count, COALESCE(SUM(quantity), 0) AS units,
-                COALESCE(SUM(quantity * unit_value), 0) AS value, COALESCE(SUM(amount), 0) AS credit
-         FROM item_returns WHERE return_date >= ?',
-        's',
-        [$monthStart]
-    );
-
-    return [
-        'as_of' => date('Y-m-d H:i'),
-        'inventory' => [
-            'item_records' => (int) $inv['records'],
-            'distinct_products' => (int) $inv['products'],
-            'units_in_stock' => (int) $inv['units'],
-            'stock_value_at_cost' => advisor_tool_money($inv['value_cost']),
-            'stock_value_at_selling_price' => advisor_tool_money($inv['value_retail']),
-            'records_in_stock' => (int) $inv['in_stock'],
-            'records_out_of_stock' => (int) $inv['out_of_stock'],
-            'records_low_stock' => (int) $inv['low_stock'],
-            'records_overstocked' => (int) $inv['overstock'],
-            'records_expiring_soon' => (int) $inv['expiring'],
-            'units_expiring_soon' => (int) $inv['expiring_units'],
-            'records_without_purchase_price' => (int) $inv['without_price'],
-            'archived_records' => (int) db_value('SELECT COUNT(*) FROM food_items WHERE archived_at IS NOT NULL'),
-        ],
-        'by_category' => array_map(fn ($c) => [
-            'category' => $c['category'],
-            'item_records' => (int) $c['item_records'],
-            'units' => (int) $c['units'],
-            'stock_value' => advisor_tool_money($c['stock_value']),
-        ], $categories),
-        'waste' => [
-            'today' => advisor_tool_waste_totals($today, $today),
-            'this_month' => advisor_tool_waste_totals($monthStart, $today),
-            'last_month' => advisor_tool_waste_totals($lastMonthStart, $lastMonthEnd),
-        ],
-        'stock_received_cost' => [
-            'this_month' => advisor_tool_received_cost($monthStart, $today),
-            'last_month' => advisor_tool_received_cost($lastMonthStart, $lastMonthEnd),
-        ],
-        'supplier_returns_this_month' => [
-            'returns' => (int) $returns['returns_count'],
-            'units' => (int) $returns['units'],
-            'value' => advisor_tool_money($returns['value']),
-            'credit' => advisor_tool_money($returns['credit']),
-        ],
-        'suppliers' => (int) db_value('SELECT COUNT(*) FROM suppliers'),
-        'deliveries' => delivery_counts(),
-    ];
-}
-
-function advisor_tool_search_items(array $in): array {
-    $status = advisor_tool_choice($in, 'status', ['any', 'in_stock', 'low_stock', 'out_of_stock', 'overstock', 'expiring_soon', 'fresh', 'expired'], 'any');
-    $sort = advisor_tool_choice($in, 'sort', ['name', 'quantity_asc', 'quantity_desc', 'expiry', 'value_desc', 'recently_updated'], 'expiry');
-    $where = empty($in['include_archived']) ? [ACTIVE_ITEM_SQL] : ['1 = 1'];
-    $types = '';
-    $params = [];
-
-    if (($q = advisor_tool_text($in, 'query')) !== '') {
-        $where[] = '(fi.name LIKE ? OR fi.barcode LIKE ? OR fc.name LIKE ? OR s.name LIKE ? OR fi.storage_location LIKE ?)';
-        $types .= 'sssss';
-        array_push($params, ...array_fill(0, 5, '%' . $q . '%'));
-    }
-    if (($category = advisor_tool_text($in, 'category')) !== '') {
-        $where[] = 'fc.name LIKE ?';
-        $types .= 's';
-        $params[] = '%' . $category . '%';
-    }
-    $where[] = match ($status) {
-        'in_stock' => 'fi.quantity > 0',
-        'low_stock' => 'fi.quantity > 0 AND fi.quantity <= ' . LOW_STOCK_THRESHOLD,
-        'out_of_stock' => 'fi.quantity = 0',
-        'overstock' => 'fi.quantity >= ' . OVERSTOCK_THRESHOLD,
-        'expiring_soon' => 'fi.quantity > 0 AND fi.expiration_date BETWEEN CURDATE() AND CURDATE() + INTERVAL ' . EXPIRING_SOON_DAYS . ' DAY',
-        'fresh' => 'fi.expiration_date > CURDATE() + INTERVAL ' . EXPIRING_SOON_DAYS . ' DAY',
-        'expired' => 'fi.expiration_date < CURDATE()',
-        default => '1 = 1',
-    };
-    $order = match ($sort) {
-        'name' => 'fi.name, fi.expiration_date',
-        'quantity_asc' => 'fi.quantity, fi.name',
-        'quantity_desc' => 'fi.quantity DESC, fi.name',
-        'value_desc' => 'fi.quantity * COALESCE(fi.purchase_price, 0) DESC, fi.name',
-        'recently_updated' => 'fi.updated_at DESC',
-        default => 'fi.expiration_date, fi.name',
-    };
-    $from = 'FROM food_items fi
-             JOIN food_categories fc ON fc.id = fi.category_id
-             LEFT JOIN suppliers s ON s.id = fi.supplier_id
-             WHERE ' . implode(' AND ', $where);
-
-    $rows = db_all(
-        "SELECT fi.name, fi.barcode, fc.name AS category, fi.quantity, fi.unit, fi.purchase_price, fi.selling_price,
-                fi.expiration_date, DATEDIFF(fi.expiration_date, CURDATE()) AS days_left, fi.storage_location,
-                s.name AS supplier, fi.archive_reason, fi.archived_at
-         $from ORDER BY $order LIMIT ?",
-        $types . 'i',
-        array_merge($params, [advisor_tool_limit($in)])
-    );
-
-    return [
-        'total_matching' => (int) db_value("SELECT COUNT(*) $from", $types, $params),
-        'items' => array_map(function ($r) {
-            $qty = (int) $r['quantity'];
-            $days = (int) $r['days_left'];
-            return [
-                'name' => $r['name'],
-                'barcode' => $r['barcode'],
-                'category' => $r['category'],
-                'quantity' => $qty,
-                'unit' => $r['unit'],
-                'unit_cost' => $r['purchase_price'] !== null ? advisor_tool_money($r['purchase_price']) : null,
-                'selling_price' => retail_price($r['selling_price'], $r['purchase_price']),
-                'selling_price_is_default_markup' => $r['selling_price'] === null && $r['purchase_price'] !== null,
-                'stock_value_at_cost' => advisor_tool_money($qty * (float) $r['purchase_price']),
-                'expires' => $r['expiration_date'],
-                'days_left' => $days,
-                'freshness' => freshness_status($days)[0],
-                'stock_status' => stock_status($qty)[0],
-                'suggested_markdown_percent' => $qty > 0 ? discount_percent($days) : 0,
-                'storage' => $r['storage_location'] ?: null,
-                'supplier' => $r['supplier'],
-                'archived' => $r['archived_at'] !== null ? archive_reason_label($r['archive_reason'])[0] : null,
-            ];
-        }, $rows),
-    ];
-}
-
-function advisor_tool_waste(array $in): array {
-    [$from, $to] = advisor_tool_range($in, date('Y-m-01'));
-    $groupBy = advisor_tool_choice($in, 'group_by', ['none', 'item', 'reason', 'category', 'supplier', 'day', 'month', 'staff'], 'none');
-    $where = ['wl.waste_date BETWEEN ? AND ?'];
-    $types = 'ss';
-    $params = [$from, $to];
-    foreach (['item' => 'fi.name', 'reason' => 'wr.reason'] as $key => $column) {
-        if (($text = advisor_tool_text($in, $key)) !== '') {
-            $where[] = "$column LIKE ?";
-            $types .= 's';
-            $params[] = '%' . $text . '%';
-        }
-    }
-    $fromSql = 'FROM waste_logs wl
-                JOIN food_items fi ON fi.id = wl.food_item_id
-                JOIN waste_reasons wr ON wr.id = wl.waste_reason_id
-                JOIN food_categories fc ON fc.id = fi.category_id
-                LEFT JOIN suppliers s ON s.id = fi.supplier_id
-                JOIN users u ON u.id = wl.user_id
-                WHERE ' . implode(' AND ', $where);
-
-    $totals = db_one("SELECT COUNT(*) AS entries, COALESCE(SUM(wl.quantity_wasted), 0) AS units, COALESCE(SUM(wl.estimated_value), 0) AS value $fromSql", $types, $params);
-    $result = [
-        'from' => $from,
-        'to' => $to,
-        'totals' => ['entries' => (int) $totals['entries'], 'units' => (int) $totals['units'], 'value' => advisor_tool_money($totals['value'])],
-    ];
-
-    if ($groupBy === 'none') {
-        $rows = db_all(
-            "SELECT wl.waste_date, fi.name, wl.quantity_wasted, fi.unit, wr.reason, wl.estimated_value, wl.notes, u.username
-             $fromSql ORDER BY wl.waste_date DESC, wl.id DESC LIMIT ?",
-            $types . 'i',
-            array_merge($params, [advisor_tool_limit($in)])
-        );
-        $result['entries'] = array_map(fn ($r) => [
-            'date' => $r['waste_date'],
-            'item' => $r['name'],
-            'quantity' => (int) $r['quantity_wasted'],
-            'unit' => $r['unit'],
-            'reason' => $r['reason'],
-            'value' => advisor_tool_money($r['estimated_value']),
-            'cleared_automatically_after_expiry' => str_starts_with((string) $r['notes'], 'Auto-moved by system'),
-            'notes' => $r['notes'] ?: null,
-            'logged_by' => $r['username'],
-        ], $rows);
-        return $result;
-    }
-
-    $group = match ($groupBy) {
-        'item' => 'fi.name',
-        'reason' => 'wr.reason',
-        'category' => 'fc.name',
-        'supplier' => "COALESCE(s.name, 'No supplier')",
-        'day' => 'wl.waste_date',
-        'month' => "DATE_FORMAT(wl.waste_date, '%Y-%m')",
-        'staff' => 'u.username',
-    };
-    $order = in_array($groupBy, ['day', 'month'], true) ? 'grp' : 'value DESC, units DESC';
-    $rows = db_all(
-        "SELECT $group AS grp, MAX(fi.unit) AS unit, COUNT(*) AS entries, SUM(wl.quantity_wasted) AS units, SUM(wl.estimated_value) AS value
-         $fromSql GROUP BY grp ORDER BY $order LIMIT ?",
-        $types . 'i',
-        array_merge($params, [advisor_tool_limit($in)])
-    );
-    $result['groups'] = array_map(fn ($r) => [$groupBy => $r['grp'], 'entries' => (int) $r['entries'], 'units' => (int) $r['units']]
-        + ($groupBy === 'item' ? ['unit' => $r['unit']] : []) + ['value' => advisor_tool_money($r['value'])], $rows);
-    return $result;
-}
-
-function advisor_tool_stock_received(array $in): array {
-    [$from, $to] = advisor_tool_range($in, date('Y-m-01'));
-    $groupBy = advisor_tool_choice($in, 'group_by', ['none', 'item', 'supplier', 'category', 'month', 'source'], 'item');
-    $where = ['sr.received_at >= ?', 'sr.received_at < ? + INTERVAL 1 DAY'];
-    $types = 'ss';
-    $params = [$from, $to];
-    if (($item = advisor_tool_text($in, 'item')) !== '') {
-        $where[] = 'fi.name LIKE ?';
-        $types .= 's';
-        $params[] = '%' . $item . '%';
-    }
-    $fromSql = 'FROM stock_receipts sr
-                JOIN food_items fi ON fi.id = sr.food_item_id
-                JOIN food_categories fc ON fc.id = fi.category_id
-                LEFT JOIN suppliers s ON s.id = fi.supplier_id
-                WHERE ' . implode(' AND ', $where);
-
-    $totals = db_one("SELECT COUNT(*) AS receipts, COALESCE(SUM(sr.quantity), 0) AS units, COALESCE(SUM(sr.quantity * sr.unit_cost), 0) AS cost $fromSql", $types, $params);
-    $result = [
-        'from' => $from,
-        'to' => $to,
-        'sources' => 'initial = new item or first stock, receive = stock received, scan = Quick Scan, adjust = quantity corrected upward, restore = restored from the archive',
-        'totals' => ['receipts' => (int) $totals['receipts'], 'units' => (int) $totals['units'], 'cost' => advisor_tool_money($totals['cost'])],
-    ];
-
-    if ($groupBy === 'none') {
-        $rows = db_all(
-            "SELECT DATE(sr.received_at) AS day, fi.name, sr.quantity, fi.unit, sr.unit_cost, sr.source
-             $fromSql ORDER BY sr.received_at DESC, sr.id DESC LIMIT ?",
-            $types . 'i',
-            array_merge($params, [advisor_tool_limit($in)])
-        );
-        $result['receipts'] = array_map(fn ($r) => [
-            'date' => $r['day'],
-            'item' => $r['name'],
-            'quantity' => (int) $r['quantity'],
-            'unit' => $r['unit'],
-            'unit_cost' => advisor_tool_money($r['unit_cost']),
-            'cost' => advisor_tool_money($r['quantity'] * $r['unit_cost']),
-            'source' => $r['source'],
-        ], $rows);
-        return $result;
-    }
-
-    $group = match ($groupBy) {
-        'item' => 'fi.name',
-        'supplier' => "COALESCE(s.name, 'No supplier')",
-        'category' => 'fc.name',
-        'month' => "DATE_FORMAT(sr.received_at, '%Y-%m')",
-        'source' => 'sr.source',
-    };
-    $order = $groupBy === 'month' ? 'grp' : 'cost DESC';
-    $rows = db_all(
-        "SELECT $group AS grp, MAX(fi.unit) AS unit, COUNT(*) AS receipts, SUM(sr.quantity) AS units, SUM(sr.quantity * sr.unit_cost) AS cost
-         $fromSql GROUP BY grp ORDER BY $order LIMIT ?",
-        $types . 'i',
-        array_merge($params, [advisor_tool_limit($in)])
-    );
-    $result['groups'] = array_map(fn ($r) => [$groupBy => $r['grp'], 'receipts' => (int) $r['receipts'], 'units' => (int) $r['units']]
-        + ($groupBy === 'item' ? ['unit' => $r['unit']] : []) + ['cost' => advisor_tool_money($r['cost'])], $rows);
-    return $result;
-}
-
-function advisor_tool_supplier_returns(array $in): array {
-    [$from, $to] = advisor_tool_range($in, date('Y-m-d', strtotime('-89 days')));
-    $where = ['r.return_date BETWEEN ? AND ?'];
-    $types = 'ss';
-    $params = [$from, $to];
-    foreach (['supplier' => 's.name', 'item' => 'fi.name'] as $key => $column) {
-        if (($text = advisor_tool_text($in, $key)) !== '') {
-            $where[] = "$column LIKE ?";
-            $types .= 's';
-            $params[] = '%' . $text . '%';
-        }
-    }
-    $rows = db_all(
-        'SELECT r.return_date, fi.name, COALESCE(s.name, \'No supplier\') AS supplier, r.quantity, fi.unit, r.unit_value, r.amount, r.reason, u.username
-         FROM item_returns r
-         JOIN food_items fi ON fi.id = r.food_item_id
-         JOIN users u ON u.id = r.user_id
-         LEFT JOIN suppliers s ON s.id = fi.supplier_id
-         WHERE ' . implode(' AND ', $where) . '
-         ORDER BY r.return_date DESC, r.id DESC',
-        $types,
-        $params
-    );
-    $value = array_sum(array_map(fn ($r) => $r['quantity'] * $r['unit_value'], $rows));
-    $credit = array_sum(array_column($rows, 'amount'));
-    return [
-        'from' => $from,
-        'to' => $to,
-        'totals' => [
-            'returns' => count($rows),
-            'units' => array_sum(array_map('intval', array_column($rows, 'quantity'))),
-            'stock_value' => advisor_tool_money($value),
-            'credit_received' => advisor_tool_money($credit),
-            'not_credited' => advisor_tool_money(max(0, $value - $credit)),
-        ],
-        'returns' => array_map(fn ($r) => [
-            'date' => $r['return_date'],
-            'item' => $r['name'],
-            'supplier' => $r['supplier'],
-            'quantity' => (int) $r['quantity'],
-            'unit' => $r['unit'],
-            'stock_value' => advisor_tool_money($r['quantity'] * $r['unit_value']),
-            'credit' => advisor_tool_money($r['amount']),
-            'reason' => $r['reason'] ?: null,
-            'recorded_by' => $r['username'],
-        ], array_slice($rows, 0, advisor_tool_limit($in))),
-    ];
-}
-
-function advisor_tool_suppliers(array $in): array {
-    $where = '1 = 1';
-    $types = '';
-    $params = [];
-    if (($q = advisor_tool_text($in, 'query')) !== '') {
-        $where = '(s.name LIKE ? OR s.contact_person LIKE ? OR EXISTS (SELECT 1 FROM supplier_products sp WHERE sp.supplier_id = s.id AND sp.name LIKE ?))';
-        $types = 'sss';
-        $params = array_fill(0, 3, '%' . $q . '%');
-    }
-    $rows = db_all(
-        "SELECT s.name, s.contact_person, s.phone, s.email, s.address,
-                COUNT(fi.id) AS active_items, COALESCE(SUM(fi.quantity), 0) AS units,
-                (SELECT COUNT(*) FROM supplier_deliveries d WHERE d.supplier_id = s.id AND d.status IN ('scheduled', 'on_the_way')) AS open_deliveries,
-                (SELECT MAX(DATE(d.delivered_at)) FROM supplier_deliveries d WHERE d.supplier_id = s.id AND d.status = 'delivered') AS last_delivered,
-                (SELECT MAX(DATE(sr.received_at)) FROM stock_receipts sr JOIN food_items ri ON ri.id = sr.food_item_id
-                 WHERE ri.supplier_id = s.id AND sr.source <> 'adjust') AS last_received,
-                (SELECT GROUP_CONCAT(CONCAT(sp.name, ' (', fc.name, ')') ORDER BY fc.name, sp.name SEPARATOR '; ')
-                 FROM supplier_products sp JOIN food_categories fc ON fc.id = sp.category_id WHERE sp.supplier_id = s.id) AS products
-         FROM suppliers s
-         LEFT JOIN food_items fi ON fi.supplier_id = s.id AND " . ACTIVE_ITEM_SQL . "
-         WHERE $where
-         GROUP BY s.id
-         ORDER BY s.name
-         LIMIT " . ADVISOR_AI_MAX_ROWS,
-        $types,
-        $params
-    );
-    return ['suppliers' => array_map(fn ($r) => [
-        'name' => $r['name'],
-        'contact_person' => $r['contact_person'] ?: null,
-        'phone' => $r['phone'] ?: null,
-        'email' => $r['email'] ?: null,
-        'address' => $r['address'] ?: null,
-        'active_items' => (int) $r['active_items'],
-        'units_in_stock' => (int) $r['units'],
-        'products_they_deliver' => $r['products'] ? explode('; ', $r['products']) : [],
-        'open_deliveries' => (int) $r['open_deliveries'],
-        'last_delivery_or_stock_received' => max($r['last_delivered'] ?? '', $r['last_received'] ?? '') ?: null,
-    ], $rows)];
-}
-
-function advisor_tool_deliveries(array $in): array {
-    $status = advisor_tool_choice($in, 'status', ['any', 'open', 'scheduled', 'on_the_way', 'delivered', 'cancelled', 'unpaid'], 'any');
-    $where = [match ($status) {
-        'open' => "status IN ('scheduled', 'on_the_way')",
-        'unpaid' => "payment_status = 'unpaid' AND status <> 'cancelled'",
-        'any' => '1 = 1',
-        default => "status = '$status'",
-    }];
-    $types = '';
-    $params = [];
-    if (($supplier = advisor_tool_text($in, 'supplier')) !== '') {
-        $where[] = 'supplier_name LIKE ?';
-        $types .= 's';
-        $params[] = '%' . $supplier . '%';
-    }
-    foreach (['from' => '>=', 'to' => '<='] as $key => $op) {
-        $value = trim((string) ($in[$key] ?? ''));
-        if ($value === '') {
-            continue;
-        }
-        if (!valid_date($value)) {
-            throw new InvalidArgumentException($key . ' must be a date written YYYY-MM-DD.');
-        }
-        $where[] = "expected_date $op ?";
-        $types .= 's';
-        $params[] = $value;
-    }
-    // Upcoming work reads best soonest first; history newest first.
-    $order = in_array($status, ['open', 'scheduled', 'on_the_way'], true) ? 'expected_date, expected_time' : 'expected_date DESC, id DESC';
-    $rows = db_all(
-        'SELECT id, supplier_name, items, amount, expected_date, expected_time, status, payment_status, notes, shipped_at, delivered_at
-         FROM supplier_deliveries WHERE ' . implode(' AND ', $where) . " ORDER BY $order LIMIT ?",
-        $types . 'i',
-        array_merge($params, [advisor_tool_limit($in)])
-    );
-    return [
-        'counts' => delivery_counts(),
-        'deliveries' => array_map(fn ($r) => [
-            'reference' => delivery_ref((int) $r['id']),
-            'supplier' => $r['supplier_name'],
-            'items' => $r['items'],
-            'amount' => $r['amount'] !== null ? advisor_tool_money($r['amount']) : null,
-            'expected_date' => $r['expected_date'],
-            'expected_time' => $r['expected_time'] ?: null,
-            'status' => delivery_status_meta($r['status'])[0],
-            'overdue' => $r['status'] === 'scheduled' && $r['expected_date'] < date('Y-m-d'),
-            'payment' => $r['payment_status'],
-            'notes' => $r['notes'] ?: null,
-            'shipped_at' => $r['shipped_at'],
-            'delivered_at' => $r['delivered_at'],
-        ], $rows),
-    ];
-}
-
-function advisor_tool_insights(array $in): array {
-    $section = advisor_tool_choice($in, 'section', ['all', 'summary', 'recommendations', 'expiry_forecast', 'order_plan'], 'all');
-    $item = mb_strtolower(advisor_tool_text($in, 'item'));
-    $matches = fn (string $name) => $item === '' || str_contains(mb_strtolower($name), $item);
-    $plain = fn (string $text) => str_replace('**', '', $text);
-    $a = advisor_analyze();
-    $t = $a['totals'];
-    $out = ['history_days' => ADVISOR_WINDOW_DAYS, 'forecast_days' => ADVISOR_HORIZON_DAYS];
-
-    if (in_array($section, ['all', 'summary'], true)) {
-        $s = $a['score'];
-        $out['zero_waste_score'] = $s ? [
-            'score' => $s['score'],
-            'grade' => $s['grade'][0] . ' (' . $s['grade'][1] . ')',
-            'waste_rate_percent_of_stock_cost' => round($s['rate'], 1),
-            'rate_measured_over_days' => $s['rate_span'],
-            'target_rate_percent' => ADVISOR_TARGET_RATE,
-            'parts' => array_map(fn ($p) => ['part' => $p['label'], 'points' => round($p['points'], 1), 'out_of' => $p['max'], 'detail' => $p['detail']], $s['parts']),
-        ] : null;
-        $out['waste_value'] = [
-            'last_30_days' => advisor_tool_money($t['value30']),
-            'previous_30_days' => advisor_tool_money($t['value_prev30']),
-            'last_90_days' => advisor_tool_money($t['value90']),
-        ];
-        $out['stock_cost_received'] = ['last_30_days' => advisor_tool_money($t['cost30']), 'last_90_days' => advisor_tool_money($t['cost90'])];
-        $out['forecast_waste_next_30_days'] = ['value' => advisor_tool_money($a['at_risk_value']), 'units' => (int) $a['at_risk_units']];
-    }
-    if (in_array($section, ['all', 'recommendations'], true)) {
-        $out['recommendations'] = array_map(fn ($r) => [
-            'priority' => ADVISOR_PRIORITIES[$r['priority']][0],
-            'title' => $r['title'],
-            'why' => $plain($r['why']),
-            'actions' => array_map($plain, $r['actions']),
-            'money_at_stake' => $r['impact'] ? advisor_tool_money($r['impact']) . ' ' . $r['impact_label'] : null,
-        ], $a['recommendations']);
-    }
-    if (in_array($section, ['all', 'expiry_forecast'], true)) {
-        $rows = array_values(array_filter($a['forecast'], fn ($r) => $matches($r['name'])));
-        $out['expiry_forecast'] = array_map(fn ($r) => [
-            'item' => $r['name'],
-            'in_stock' => $r['quantity'],
-            'unit' => $r['unit'],
-            'sells_per_day' => round($r['pace'], 2),
-            'expires' => $r['expires'],
-            'days_left' => $r['days_left'],
-            'forecast_left_unsold' => $r['leftover'],
-            'value_at_risk' => advisor_tool_money($r['value']),
-            'confidence' => $r['confidence'],
-            'what_to_do' => $r['action'],
-        ], array_slice($rows, 0, 25));
-    }
-    if (in_array($section, ['all', 'order_plan'], true)) {
-        $rows = array_values(array_filter($a['order_plan'], fn ($o) => $matches($o['name'])));
-        $out['order_plan'] = array_map(fn ($o) => [
-            'item' => $o['name'],
-            'unit' => $o['unit'],
-            'sells_per_day' => round($o['pace'], 2),
-            'shelf_life_days' => $o['shelf'],
-            'stock_that_will_still_sell' => $o['sellable'],
-            'days_of_stock' => round($o['cover'], 1),
-            'order_at_most' => $o['cap'],
-            'share_wasted_percent' => $o['waste_share'] !== null ? round($o['waste_share'] * 100) : null,
-            'status' => $o['status'][0],
-            'confidence' => $o['confidence'],
-        ], array_slice($rows, 0, 25));
-    }
-    if ($item !== '') {
-        $products = array_values(array_filter($a['products'], fn ($p) => $matches($p['name'])));
-        $out['products'] = array_map(fn ($p) => [
-            'item' => $p['name'],
-            'category' => $p['category'],
-            'supplier' => $p['supplier'],
-            'storage' => $p['storage'] ?: null,
-            'still_stocked' => $p['active'],
-            'in_stock' => $p['stock'],
-            'unit' => $p['unit'],
-            'batches' => array_map(fn ($b) => ['quantity' => $b['quantity'], 'expires' => $b['expires'], 'days_left' => $b['days_left']], $p['batches']),
-            'estimated_sales_per_day' => round($p['pace'], 2),
-            'history_days' => $p['days'],
-            'confidence' => $p['confidence'],
-            'received_all_time' => $p['received'],
-            'wasted_all_time' => $p['wasted'],
-            'returned_to_supplier_all_time' => $p['sent_back'],
-            'wasted_last_90_days' => ['units' => $p['waste90'], 'value' => advisor_tool_money($p['value90']), 'main_reason' => $p['main_reason']],
-        ], array_slice($products, 0, 10));
-    }
-    return $out;
 }
 
 /* ---------- Calling Claude ---------- */

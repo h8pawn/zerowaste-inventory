@@ -162,9 +162,9 @@ page_header(
                         <?php if ($score): ?>Your Zero-Waste Score is <strong><?= $score['score'] ?>/100</strong> (<?= e($score['grade'][1]) ?>).<?php endif; ?>
                     </p>
                     <?php if ($aiOn): ?>
-                        <p>Ask me anything about the store in your own words: what's in stock, what is expiring, what we waste and why, suppliers, deliveries, or what to order.</p>
+                        <p>Ask me anything about the store in your own words: stock, expiry dates, waste and reports, suppliers, deliveries, returns, the archive, user accounts, or what to order.</p>
                     <?php else: ?>
-                        <p>Ask me what's in stock, what to do today, what will expire unsold, how much to order, or about any item by name.</p>
+                        <p>Ask me what's in stock, what to do today, what will expire unsold, how much to order, about deliveries, returns, the archive, users or a month's report, or about any item or supplier by name.</p>
                     <?php endif; ?>
                 </div>
                 <?php foreach ($chat as $turn): ?>
